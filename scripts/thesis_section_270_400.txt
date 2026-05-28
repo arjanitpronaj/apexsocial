@@ -1,0 +1,93 @@
+[272] 7.6. Dimensioni etik i moderimit algoritmik
+[273] Çdo diskutim mbi moderimin automatik të përmbajtjeve duhet të marrë parasysh dimensionin etik. Moderimi i diskursit online është, në thelb, ushtrim i pushtetit dhe vendimi se çfarë lejohet ka pasoja direkte mbi lirinë e shprehjes, e cila është e drejtë themelore njerëzore e garantuar nga neni 19 i Deklaratës Universale të të Drejtave të Njeriut. Platformat online janë bërë arbitre të diskursit publik me autoritet të madh shoqëror, pavarësisht se vetëprezantohen si neutralë teknikë .
+[274] 7.7. Sistemet hibride dhe roli i mbikëqyrjes njerëzore
+[275] Konsensusi aktual akademik dhe industrial është se zgjidhjet më efektive janë sistemet hibride që kombinojnë moderimin algoritmik me mbikëqyrjen njerëzore të vazhdueshme. Sistemet plotësisht automatike prodhojnë nivele të papranueshme gabimesh, ndërkohë sistemet plotësisht njerëzore janë të pashkallëzueshme dhe subjekt i lodhjes dhe paragjykimit të moderatorëve .
+[276] Sistemi optimal ndërvepron mes dy niveleve: algoritmi trajton volumin duke identifikuar rastet e qarta, ndërkohë gjykimi njerëzor trajton rastet e paqarta dhe shërben si mekanizëm kontrolli. Kjo ndarje pune shfrytëzon avantazhet e secilit: shpejtësinë dhe qëndrueshmërinë e makinës, dhe gjykimin kontekstual e empatinë e njeriut.
+[278] 8. Implementimi i rrjetit social
+[279] Në këtë projekt, si pjesë kryesore fillimisht është zhvilluar një aplikacion web në formë rrjeti social të thjeshtë, i cili shërben si ambient praktik për testimin dhe demonstrimin e funksionalitetit të sistemit për detektimin e përmbajtjeve të dëmshme. Qëllimi i këtij aplikacioni është të simulojë një platformë reale ku përdoruesit mund të regjistrohen, të kyçen dhe të publikojnë përmbajtje në formë postimesh, të cilat më pas analizohen nga sistemi.
+[280] Aplikacioni është ndërtuar duke përdorur teknologji bazike të zhvillimit web si HTML për strukturën, CSS për dizajnin dhe JavaScript për ndërveprimin dinamik, ndërsa për pjesën e backend-it është përdorur PHP dhe C# ASP.NET Core, ku PHP merret me menaxhimin e sesioneve dhe routing-un ndërsa C# implementon gjithë logjikën e biznesit dhe moderimin. Për ruajtjen e të dhënave është përdorur një databazë MySQL, ku ruhen informacionet e përdoruesve, postimet, komentet dhe logu i analizave ML.
+[281] Funksionalitetet kryesore të aplikacionit përfshijnë:
+[282] Regjistrimin dhe autentifikimin e përdoruesve
+[283] Krijimin dhe publikimin e postimeve me tekst, foto dhe PDF
+[284] Shfaqjen e përmbajtjeve në një feed dinamik me sistem like-ash dhe komentesh
+[285] Sistemin e miqësisë dhe njoftimeve në kohë reale
+[286] Integrimin me sistemin e analizës ML për kontrollin e çdo përmbajtjeje para publikimit
+[287] Një element shumë i rëndësishëm është integrimi i aplikacionit me modelin e Machine Learning, ku çdo tekst i futur nga përdoruesi dërgohet për analizë përpara publikimit. Në bazë të rezultatit, sistemi mund të lejojë publikimin ose të bllokojë përmbajtjen nëse ajo klasifikohet si e dëmshme.
+[289] Figura 4: Ndërfaqja e rrjetit social Apex Social
+[291] 8.1 Arkitektura Tre-Shtresor
+[292] ApexSocial implementon modelin Singular Architecture, ku shërbimi C# ASP.NET Core funksionon si bërthama e vetme e logjikës së biznesit. Asnjë vendim moderimi nuk merret drejtpërdrejt nga PHP ose JavaScript,  çdo kërkesë detyrimisht kalon nëpër C# i cili komunikon me Python ML API.
+[295] Figura 5: Arkitektura Tre-Shtresor (Singular Architecture)
+[296] Kjo arkitekturë ofron disa avantazhe kritike:
+[297] C# funksionon si single point of truth për të gjitha vendimmarrjet e moderimit;
+[298] PHP mbetet i thjeshtë si shtresë prezantimi pa logjikë biznesi;
+[299] Python ML API është i izoluar dhe i zëvendësueshëm;
+[300] SignalR lejon njoftime në kohë reale pa polling.
+[307] 8.2 Admin paneli (Ndërfaqja e administratorit)
+[308] Përveç ndërfaqes së përdoruesit, në projekt është zhvilluar edhe një admin panel (ndërfaqe e administratorit), i cili luan rol shumë të rëndësishëm në menaxhimin dhe kontrollin e sistemit. Ky panel i mundëson administratorit të ketë një pasqyrë të plotë mbi aktivitetin në aplikacion dhe të ndërhyjë kur është e nevojshme.
+[309] Përmes admin panelit, administratori mund të:
+[310] Shikojë të gjitha postimet e publikuara në platformë
+[311] Identifikojë përmbajtjet e raportuara ose të klasifikuara si të dëmshme
+[312] Fshijë ose bllokojë postime të papërshtatshme
+[313] Menaxhojë përdoruesit (aktivizim, çaktivizim ose fshirje të llogarive)
+[314] Rishikojë vendimet e marra nga sistemi i Machine Learning
+[315] Admin paneli ofron seksionin e statistikave ML nëpërmjet endpoint-it GET /api/admin/stats dhe komunikim real-time me SignalR, duke njoftuar adminët menjëherë kur postime të reja hyjnë në radhën e rishikimit.
+[318] Figura 6: ndërfaqja e moderimit dhe statistikave ML
+[320] 9. Detektimin dhe eliminimin e përmbajtjeve të dëmshme
+[321] Machine Learning në këtë projekt automatizoi procesin e identifikimit të përmbajtjeve të dëmshme duke e kthyer atë nga kontroll manual në vendimmarrje të menjëhershme të bazuar në të dhëna. Sistemi analizon çdo tekst të postuar dhe merr vendim brenda milisekondave, duke kombinuar tre mekanizma komplementare: kontroll me whitelist dhe fjalëkyçe për raste të njohura, dhe dy modele të pavarura ML për rastet e panjohura.
+[322] Baza teknike e sistemit është kombinimi TF-IDF + Logistic Regression, implementuar si Pipeline sklearn. Ky kombinim u zgjodh për balancën optimale ndërmjet saktësisë mbi 94%, shpejtësisë së inferimit, dhe kompleksitetit të menaxhueshëm, duke e bërë sistemin të përshtatshëm për analizë në kohë reale.
+[324] 9.1 Struktura e sistemit
+[325] Sistemi ML ndahet në dy komponentë kryesorë: trajnimi dhe inferimi. Trajnimi kryhet njëherë kur sistemi konfigurohet fillimisht ose kur dataset-et përditësohen. Inferimi kryhet vazhdimisht gjatë punës së platformës, për çdo tekst të postuar.
+[327] Figura 7: Arkitektura e sistemit ML për analizën e përmbajtjes në Apex Social
+[329] 9.2 Dataset-et e trajnimit
+[330] Saktësia e çdo modeli ML varet drejtpërdrejt nga cilësia dhe shumëllojshmëria e dataset-it. ApexSocial përdor kater burime të dhënash publike:
+[331] Figura 8: Përmbledhje e dataset-eve të përdorura për trajnim dhe modeleve përkatëse
+[333] 9.3 Pastrimi i tekstit
+[334] Implementimi fillon me trajnimin e modelit përmes skriptës train_model.py, ku dataset-i lexohet nga file dhe përpunohet duke përdorur Pandas. Teksti pastrohet përmes funksionit clean(), i cili normalizon të dhënat duke hequr  @user dhe karaktere të panevojshme, në mënyrë që modeli të mësojë vetëm nga informacioni relevant.
+[335] Sistemi ApexSocial përdor dy modele paralele të pavarura, secilit i dedikuar një kategorie specifike dëmi: pipeline.pkl për gjuhën e urrejtjes dhe scam_pipeline.pkl për mashtrimet/phishing. Kjo ndarje specifike rrit saktësinë duke lejuar optimizim të pavarur të secilit model. Funksioni i pastrimit të tekstit është identik midis trajnimit dhe inferimit, duke siguruar konsistencë:
+[337] Figura 9: Funksioni  për pastrimin dhe normalizimin e tekstit
+[338] 9.4 Trajnimi
+[339] Modeli ndërtohet si Pipeline i scikit-learn, dy hapa të pavarur (TF-IDF dhe Logistic Regression) të paketuar si objekt i vetëm i serializueshëm. Kur ruhet si .pkl, të dy hapat aplikohen automatikisht gjatë inferimit në të njëjtën renditje si gjatë trajnimit:
+[341] Figura 10: Implementimi i pipeline-it të trajnimit me TF-IDF dhe Logistic Regression
+[342] TF-IDF e konverton çdo tekst nga varg karakteresh në vektor numerik. Parametri ngram_range=(1,3) do të thotë se modeli mëson jo vetëm nga fjalët e vetme, por edhe nga çiftet dhe treshet fjalësh që kjo e bën atë efektiv për shprehje si "kill yourself" ose "verify your account", ku kuptimi qëndron tek kombinimi, jo tek fjala e vetme.
+[343] Logistic Regression merr atë vektor dhe llogarit probabilitetin që teksti të jetë i dëmshëm: vlerë midis 0.0 dhe 1.0.
+[344] Parametri class_weight='balanced' është kritik: dataset-et e gjuhës së urrejtjes janë të çbalancuara, rreth 85% shembuj të sigurt dhe 15% të dëmshëm. Pa këtë parametër, modeli do të klasifikonte gjithçka si të sigurt duke arritur saktësi numerike të lartë por duke humbur çdo rast të dëmshëm.
+[345] Top of Form
+[347] 9.5 Dy modele paralele
+[348] Projekti trajnon dy modele krejtësisht të pavarura me dataset-e të ndryshme, duke optimizuar secilin për tipologjinë specifike të dëmit. Kjo qasje 'specialist models' performon më mirë sesa një model i vetëm gjithëpërfshirës.
+[350] Figura 11: Implementimi i funksionit të trajnimit dhe evaluimit të modelit (train_sklearn)*
+[351] Arsyeja e ndarjes qëndron në natyrën gjuhësore të ndryshme të dy kategorive. Gjuha e urrejtjes karakterizohet nga agresion dhe fyerje drejtpërdrejt ndaj personit. Mashtrimet karakterizohen nga urgjencë artificiale, premtime monetare dhe kërkesa për të dhëna personale. Një model i vetëm gjithëpërfshirës ngatërronte tiparet e të dy kategorive. Dy modele specialistë lejojnë optimizim të pavarur dhe performojnë më mirë secili në fushën e vet.
+[353] 9.6 Funksioni analizmit
+[354] Kur C# backend dërgon tekst te endpoint-i /analyze, funksioni analyze() zbaton tre nivele kontrolli të njëpasnjëshme. Secili nivel kthen vendim nëse ka arsye të mjaftueshme; ndryshe kalon te niveli pasues:
+[356] Figura 12: Implementimi i funksionit analyze() për analizën e përmbajtjes
+[357] Logjika e tre niveleve është e organizuar sipas kostos së llogaritjes. Kontrolli me fjalëkyçe (Niveli 1) është shumë më i shpejtë se thirrja e modelit ML. Rastet e qarta dhe të njohura zgjidhen menjëherë pa aktivizuar modelin, ndërkohë ML-ja rezervohet për tekstet e panjohura e të paqarta.
+[359] 9.7 Shmangja e rezultateve false pozitive
+[360] Kontrolli i thjeshtë if kw in text do të bllokonte fjalë të padjallëzuara si "skill" sepse përmban "kill", ose "classical" sepse përmban "ass". Funksioni kw_hit_boundary() e zgjidh këtë duke kërkuar kufij të saktë të fjalës (\b) për fjalët e vetme:
+[362] Figura 13: Implementimi i funksionit kw_hit_boundary() për reduktimin e false positive
+[363] 9.8 Konfigurimi i jashtëm
+[364] Të gjithë parametrat operacionalë ruhen në models/config.json dhe lexohen çdo herë që API-a niset. Kjo qasje lejon rregullimin e pragut apo shtimin e fjalëkyçeve të reja pa prekur kodin burimor dhe pa ri-trajnuar modelin:
+[366] Figura 14: Konfigurimi i parametrave të sistemit përmes skedarit config.json
+[367] Funksioni update_config () ekzekutohet automatikisht pas çdo trajnimi dhe garanton që pragu të mos bjerë nën vlerën minimale 0.50 — nën të cilën sistemi do të fillonte të flagonte sasi të mëdha tekstesh normale si të dëmshme:
+[369] Figura 15: Implementimi i funksionit update_config() për përditësimin e parametrave të konfigurimit
+[370] 9.9 Endpoint-et REST të API-t python
+[371] Integrim të plotë me C# backend dhe analizë në kohë reale:
+[372] Figura 16: Endpoint-et REST dhe funksionaliteti i API-së në Python
+[373] C# backend dërgon kërkesë POST /analyze me:
+[375] Figura 17: Logjika e vendimmarrjes
+[376] Pas implementimit të logjikës së analizës në backend, rezultatet reflektohen drejtpërdrejt në ndërfaqen e përdoruesit. Siç paraqitet në Figurën 20, përdoruesi gjatë shkrimit të një postimi merr feedback të menjëhershëm nga sistemi lidhur me përmbajtjen e tij.
+[378] Figura 18: Shfaqja e rezultatit të analizës në ndërfaqen e përdoruesit
+[379] Në këtë shembull, teksti i futur përmban gjuhë fyese ndaj një individi dhe klasifikohet si përmbajtje e ndaluar. Sistemi shfaq mesazhin “Forbidden – Content contains hate speech or harassment”, duke informuar përdoruesin për arsyen e bllokimit dhe duke parandaluar publikimin e postimit. Ky mekanizëm i feedback-ut në kohë reale ndihmon përdoruesin të korrigjojë përmbajtjen para publikimit dhe kontribuon në rritjen e cilësisë së komunikimit në platformë.
+[385] 10. Përfundimi
+[386] Ky punim akademik ka adresuar njërin prej sfidave më komplekse të epokës digjitale: detektimin dhe eliminimin automatik të përmbajtjeve të dëmshme në platformat sociale nëpërmjet teknikave të mësimit makinerik. Pyetja qendrore e punimit, nëse inteligjenca artificiale mund të zëvendësojë ose të plotësojë gjykimin njerëzor në moderimin e diskursit online, ka gjetur një përgjigje praktike dhe të argumentuar përmes zhvillimit të platformës ApexSocial, e cila integron sistemin inteligjent të moderimit drejtpërdrejt në infrastrukturën e rrjetit social. Rishikimi i literaturës akademike ka ndriçuar trajektoren historike të kësaj fushe kërkimore. Nga metodat statike të listave të fjalëve të ndaluara të dekadave të mëparshme, nëpërmjet modeleve statistikore të fillimit të shekullit XXI, deri te arkitekturat e thella transformer si BERT dhe GPT të periudhës aktuale, fusha ka njohur progres të konsiderueshëm. Megjithatë, gjuha e urrejtjes dhe mashtrimet mbeten fenomene dinamike që evoluojnë me ritme më të larta sesa aftësia e modeleve statike për t'i kapur. Kjo njohuri ka informuar drejtpërdrejt zgjedhjet arkitekturore të ApexSocial: sistemi është konceptuar me vetëdijen se efektiviteti dhe adaptueshmëria, jo përsosmëria absolute, përbëjnë kriterin e vlerësimit praktik.
+[387] Pesë hipotezat e ngritura në fillim të punimit kanë gjetur mbështetje empirike nëpërmjet implementimit dhe vlerësimit eksperimental. Hipoteza e parë, mbi aftësinë e teknikave të mësimit makinerik për të arritur saktësi të lartë në detektimin e gjuhës së urrejtjes, u konfirmua duke tejkaluar pragun prej 94% në grupet e të dhënave të testimit, rezultat i krahasueshëm me gjetjet e literaturës bashkëkohore. Hipoteza e dytë, mbi rolin e përpunimit të gjuhës natyrore, u vërtetua duke demonstruar se paraqitja e tekstit nëpërmjet n-grameve rrit ndjeshëm cilësinë e klasifikimit krahasuar me qasjet e thjeshtuara. Hipoteza e tretë u konfirmua gjatë fazës së pastrimit dhe normalizimit të të dhënave, ku heqja e elementeve jo-relevante shoqërohet me përmirësim të matshëm të performancës. Hipotezat e katërt dhe e pestë, mbi superioritetin e modeleve të mësuara ndaj rregullave manuale dhe mbi domosdoshmërinë e trajnimit me grupe të dhënash të shumëllojshme, u vërtetuan duke krahasuar qasjet dhe duke analizuar kufizimet e secilit mekanizëm në izolim.
+[388] Kontributi shkencor dhe praktik i punimit shtrihet në disa dimensione. Nga perspektiva arkitekturore, sistemi demonstron qëndrueshmërinë e ndarjes në shtresa me përgjegjësi të pavarura, konkretisht shtresa e mësimit makinerik, shtresa e logjikës së biznesit dhe shtresa e ndërfaqes, duke lejuar që secila të evoluojë në mënyrë të pavarur. Nga perspektiva algoritmike, qasja me nivele të njëpasnjëshme vendimmarrjeje, ku rastet e qarta zgjidhen me kosto llogaritëse minimale dhe rastet e paqarta ridrejtohen drejt verifikimit shtesë, paraqet një balancim pragmatik midis saktësisë dhe efikasitetit.
+[389] Aspektet etike të identifikuara gjatë punimit tejkalojnë dimensionin teknik dhe prekin thelbin e çështjeve shoqërore. Çdo sistem moderimi automatik ngre pyetje themelore rreth lirisë së shprehjes, kufijve të lejueshëm të censurës algoritmike dhe përfaqësimit të drejtë të grupeve demografike. Paragjykimet e pranishme në grupet e të dhënave trajnuese mund të amplifikohen sistematikisht nga modelet e mësimit makinerik, duke çuar në diskriminim algoritmik. ApexSocial e adresoi këtë shqetësim duke ruajtur mbikëqyrjen njerëzore në hallkat kyçe të procesit, duke garantuar transparencë vendimmarrëse dhe duke integruar mekanizma apelimi nëpërmjet raportimeve të përdoruesve. Kufizimet e sistemit janë identifikuar me qartësi akademike, pasi njohja e tyre është parakusht për çdo zhvillim të ardhshëm të bazuar në realitet. Kufizimi kryesor lidhet me gjuhën: modelet aktuale janë trajnuar mbi grupe të dhënash kryesisht anglisht-folëse dhe performanca e tyre mbi gjuhën shqipe mbetet e pavlerësuar, si pasojë e një pabarazie më të gjerë në ekosisteminë e burimeve gjuhësore digjitale. Kufizimi i dytë ka të bëjë me pamundësinë e kuptimit të kontekstit pragmatik, ironisë dhe sarkazmës. Kufizimi i tretë qëndron në staticitatin e modeleve përballë evolucionit të vazhdueshëm të gjuhës së urrejtjes dhe mashtrimeve, duke e bërë ri-trajnimin periodik të domosdoshëm.
+[390] Perspektivat e ardhshme të zhvillimit janë të shumëanshme. Integrimi i modeleve gjuhësore shumëgjuhëshe të specifikuara për gjuhën shqipe do të adresonte kufizimin kryesor gjuhësor. Ndërtimi i një korpusi shqiptar të etiketuar nga ekspertë linguistë dhe specialistë të sigurisë kibernetike do të ishte kontributi më i rëndësishëm afatgjatë. Integrimi i analizës shumëmodale dhe zbatimi i paradigmave të mësimit të federuar do t'i adresonin, përkatësisht, ekspansionin ndaj formateve vizuale dhe shqetësimet e privatësisë në kuadër të Rregullores GDPR.
+[391] Në mënyrë konkluzive, ky punim argumenton se tensioni midis sigurisë digjitale dhe lirisë së shprehjes nuk është i pazgjidhshëm. Këto dy vlera mund të harmonizohen nëpërmjet teknologjisë së menduar, transparente dhe të vendosur nën mbikëqyrje njerëzore të vazhdueshme. Mësimi makinerik nuk është dhe nuk pretendon të jetë zgjidhja përfundimtare, por një mjet i fuqishëm i cili, kur kombinohet me gjykim njerëzor, dizajn etik dhe vetëdije të vazhdueshme për kufizimet e veta, kontribuon me efikasitet në mbrojtjen e hapësirave digjitale. Sfida e moderimit të përmbajtjes mbetet, në thelb, sfidë shoqërore dhe kulturore, dhe çdo zgjidhje teknike kërkon të shoqërohet me dialog publik, korniza rregullatore të qarta dhe angazhim institucional. ApexSocial, si prototip funksional dhe si punim akademik, synon të kontribuojë me njërin element të këtij mozaiku më të gjerë.
+[392] Aspekte të realizuara me sukses:
+[393] Integrimi i plotë i sistemit ML me arkitekturën tre-shtresore (PHP, C# dhe Python), ku secila shtresë ruan autonominë dhe komunikimi ndodh nëpërmjet kontratave të qarta ndërfaqeje.
+[394] Implementimi i qasjes me dy modele specialistë të pavarura (gjuha e urrejtjes dhe mashtrimet/phishing), e cila ka treguar superioritet të matshëm ndaj modelit të vetëm gjithëpërfshirës.
+[395] Mekanizmi i vendimmarrjes me tre nivele të njëpasnjëshme (whitelist, fjalëkyçe, ML), i cili balancon saktësinë me efikasitetin llogaritës.
+[396] Ruajtja e mbikëqyrjes njerëzore nëpërmjet panelit administrativ dhe mekanizmave të auditimit, e cila vendos sistemin automatik nën kontroll të ndërgjegjshëm institucional.
+[397] Rezultate dhe arritje kryesore:
+[398] Saktësi klasifikuese mbi 94% në detektimin e gjuhës së urrejtjes, e krahasueshme me standardet e literaturës bashkëkohore.
+[399] Konfirmim eksperimental i të pesë hipotezave të ngritura, duke vërtetuar lidhjen e drejtpërdrejtë ndërmjet cilësisë së të dhënave, zgjedhjes së algoritmit dhe performancës operative të sistemit.
