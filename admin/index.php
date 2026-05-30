@@ -26,8 +26,8 @@ $bannedUsers  = (int)$pdo->query("SELECT COUNT(*) FROM users WHERE is_blocked=1"
 $blockedCount = (int)$pdo->query("SELECT COUNT(*) FROM content_analysis WHERE label=1")->fetchColumn();
 $approvedPosts= (int)$pdo->query("SELECT COUNT(*) FROM posts WHERE status='approved'")->fetchColumn();
 $rejectedPosts= (int)$pdo->query("SELECT COUNT(*) FROM posts WHERE status='rejected'")->fetchColumn();
-$blockedPosts = (int)$pdo->query("SELECT COUNT(*) FROM posts WHERE status='pending'")->fetchColumn();
-$blockedCmts  = (int)$pdo->query("SELECT COUNT(*) FROM comments WHERE status='pending'")->fetchColumn();
+$blockedPosts = (int)$pdo->query("SELECT COUNT(*) FROM posts WHERE status IN ('rejected','pending')")->fetchColumn();
+$blockedCmts  = (int)$pdo->query("SELECT COUNT(*) FROM comments WHERE status IN ('rejected','pending')")->fetchColumn();
 
 $harmfulCount = (int)$pdo->query("SELECT COUNT(*) FROM content_analysis WHERE label=1")->fetchColumn();
 $safeCount    = (int)$pdo->query("SELECT COUNT(*) FROM content_analysis WHERE label=0")->fetchColumn();
@@ -144,10 +144,10 @@ echo adminSidebar();
             <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
         </div>
         <div class="grow">
-            <div class="queue-banner-title"><?= $blockedPosts + $blockedCmts ?> item<?= ($blockedPosts + $blockedCmts) != 1 ? 's' : '' ?> awaiting review</div>
+            <div class="queue-banner-title"><?= $blockedPosts + $blockedCmts ?> item<?= ($blockedPosts + $blockedCmts) != 1 ? 's' : '' ?> blocked by moderation</div>
             <div class="queue-banner-sub"><?= $blockedPosts ?> posts · <?= $blockedCmts ?> comments</div>
         </div>
-        <span class="btn btn-primary btn-sm">Review Now →</span>
+        <span class="btn btn-primary btn-sm">View blocked →</span>
     </div>
 </a>
 <?php endif; ?>

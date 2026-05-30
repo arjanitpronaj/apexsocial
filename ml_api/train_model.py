@@ -30,9 +30,7 @@ INPUT_LOG = MODEL_DIR / "user_inputs.jsonl"
 MODEL_DIR.mkdir(exist_ok=True)
 DS_DIR.mkdir(exist_ok=True)
 
-log.info("=" * 62)
-log.info("  ApexSocial Trainer v6.0  (%s)", 'incremental' if INCREMENTAL else 'full')
-log.info("=" * 62)
+log.info("ApexSocial trainer starting (%s)", "incremental" if INCREMENTAL else "full")
 
 
 def load_keywords_from_config():
@@ -104,7 +102,6 @@ def find_col(df: pd.DataFrame, keywords: list):
 
 def build_pipeline(n_samples: int) -> Pipeline:
     min_df = 2 if n_samples >= 8000 else 1
-    # Drop terms in >92% of docs (e.g. repeated "user"/"url" after clean()) on large corpora.
     max_df = 0.92 if n_samples >= 2000 else 1.0
 
     if n_samples >= 5000:
@@ -114,7 +111,6 @@ def build_pipeline(n_samples: int) -> Pipeline:
     else:
         calib_cv = 2
 
-    # char_wb: Unicode-safe (CJK, Arabic, Latin, diacritics) — no strip_accents corruption
     base_lr = LogisticRegression(
         C=0.8,
         solver="saga",
@@ -123,7 +119,6 @@ def build_pipeline(n_samples: int) -> Pipeline:
         class_weight="balanced",
         random_state=42,
     )
-
     return Pipeline([
         ("tfidf", TfidfVectorizer(
             max_features=30000,
@@ -407,9 +402,7 @@ if INCREMENTAL:
 
 update_config()
 
-log.info("\n" + "=" * 62)
-log.info("  MODEL 1: Hate  (pipeline.pkl)")
-log.info("=" * 62)
+log.info("Training hate model -> pipeline.pkl")
 
 hate_file = MODEL_DIR / "labeled_data.csv"
 if not hate_file.exists():
@@ -468,9 +461,7 @@ sample = pd.concat([
 sample.to_csv(MODEL_DIR / "dataset.csv", index=False)
 log.info("[Hate] Saved -> models/dataset.csv")
 
-log.info("\n" + "=" * 62)
-log.info("  MODEL 2: Scam  (scam_pipeline.pkl)")
-log.info("=" * 62)
+log.info("Training scam model -> scam_pipeline.pkl")
 
 phish_rows = gather_static_scam_frames()
 
@@ -499,9 +490,4 @@ else:
     log.info("\n[Scam] No scam datasets found. Keyword-only detection active.")
     log.info(f"       Place datasets in: {DS_DIR}/")
 
-log.info("\n" + "=" * 62)
-log.info("  Training complete!")
-log.info("  pipeline.pkl      <- hate model")
-log.info("  scam_pipeline.pkl <- scam model")
-log.info("  Next: python api.py")
-log.info("=" * 62)
+log.info("Training complete. Start API with: python api.py")

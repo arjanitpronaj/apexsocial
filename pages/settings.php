@@ -13,7 +13,6 @@ $error = '';
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $action = $_POST['action'] ?? '';
 
-    // ── Update profile ──────────────────────────────────────
     if ($action === 'update_profile') {
         $fullName = trim($_POST['full_name'] ?? '');
         $bio      = trim($_POST['bio'] ?? '');
@@ -29,7 +28,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         }
     }
 
-    // ── Upload avatar ───────────────────────────────────────
     if ($action === 'upload_avatar' && !empty($_FILES['avatar']['name'])) {
         $ext = strtolower(pathinfo($_FILES['avatar']['name'], PATHINFO_EXTENSION));
         if (in_array($ext, ['jpg','jpeg','png','gif','webp'])) {
@@ -51,7 +49,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         }
     }
 
-    // ── Remove avatar ───────────────────────────────────────
     if ($action === 'remove_avatar') {
         if ($me['avatar'] && file_exists(UPLOAD_PATH.'avatars/'.$me['avatar'])) {
             @unlink(UPLOAD_PATH.'avatars/'.$me['avatar']);
@@ -61,7 +58,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $me = getCurrentUser($pdo);
     }
 
-    // ── Change email ────────────────────────────────────────
     if ($action === 'change_email') {
         $newEmail = trim($_POST['new_email'] ?? '');
         $password = $_POST['confirm_password'] ?? '';
@@ -84,7 +80,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         }
     }
 
-    // ── Change password ─────────────────────────────────────
     if ($action === 'change_password') {
         $current = $_POST['current_password'] ?? '';
         $newPass = $_POST['new_password'] ?? '';
@@ -103,7 +98,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         }
     }
 
-    // ── Change username ─────────────────────────────────────
     if ($action === 'change_username') {
         $newUsername = trim($_POST['new_username'] ?? '');
         $password   = $_POST['confirm_password_uname'] ?? '';

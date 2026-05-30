@@ -1,6 +1,4 @@
-/**
- * ApexSocial native WebSocket client (ws_server.py on port 8080).
- */
+// WebSocket client for ws_server.py (:8080)
 (function (global) {
     'use strict';
 
@@ -125,7 +123,7 @@
         const prob = payload.harmful_prob != null
             ? ` (${Number(payload.harmful_prob).toFixed(1)}%)`
             : '';
-        if (v === 'FORBIDDEN') {
+        if (v === 'FORBIDDEN' || v === 'REVIEW') {
             const cat = payload.category === 'hate_speech'
                 ? 'Hate speech'
                 : (payload.category === 'phishing_scam' ? 'Scam/phishing' : 'Policy');
@@ -260,9 +258,6 @@
                 break;
             case 'moderation_result':
                 emit('ModerationResult', msg.payload || msg);
-                break;
-            case 'new_pending':
-                emit('NewPending', msg.payload || msg);
                 break;
             case 'queue_update':
                 emit('QueueUpdate', msg.payload || msg);

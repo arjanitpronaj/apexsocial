@@ -1,5 +1,6 @@
 <?php
-$_sb_pending = 0;
+$_sb_pending = (int)$pdo->query("SELECT COUNT(*) FROM posts WHERE status IN ('rejected','pending')")->fetchColumn()
+    + (int)$pdo->query("SELECT COUNT(*) FROM comments WHERE status IN ('rejected','pending')")->fetchColumn();
 $_sb_harmful = (int)$pdo->query("SELECT COUNT(*) FROM content_analysis WHERE label=1 AND reviewed_by_admin=0")->fetchColumn();
 $_sb_reports = (int)$pdo->query("SELECT COUNT(*) FROM reports WHERE status='pending'")->fetchColumn();
 

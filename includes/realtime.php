@@ -1,8 +1,5 @@
 <?php
-/**
- * PHP → Python WebSocket push bridge (fire-and-forget).
- * Events are delivered by ml_api/ws_server.py on port 8081.
- */
+/** WebSocket push from PHP to ws_server (port 8081). */
 
 if (!defined('REALTIME_PUSH_KEY')) {
     define('REALTIME_PUSH_KEY', getenv('APEX_WS_KEY') ?: 'apex-ws-key-2025');
@@ -96,20 +93,6 @@ function apexModerationResult(
         'reason' => $reason,
         'msg' => $msg,
     ], $authorId, false);
-}
-
-function apexNewPending(string $contentType, int $id, int $authorId, string $preview, float $mlProb, string $mlCat): void
-{
-    apexRealtimePush('NewPending', [
-        'type' => $contentType,
-        'postId' => $contentType === 'post' ? $id : null,
-        'commentId' => $contentType === 'comment' ? $id : null,
-        'userId' => $authorId,
-        'preview' => mb_substr($preview, 0, 120),
-        'mlProb' => $mlProb,
-        'mlCat' => $mlCat,
-        'ts' => date('c'),
-    ], null, true);
 }
 
 function apexQueueUpdate(): void

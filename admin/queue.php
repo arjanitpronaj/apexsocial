@@ -39,7 +39,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $action = $_POST['action'] ?? '';
     $reason = trim($_POST['reason'] ?? '');
 
-    if ($id && in_array($type, ['post','comment']) && in_array($action, ['approve','reject'])) {
+    if ($id && in_array($type, ['post','comment'], true) && in_array($action, ['approve','reject'], true)) {
         $newStatus = $action === 'approve' ? 'approved' : 'rejected';
         $itemText = '';
         $itemCategory = 'safe';
@@ -54,7 +54,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             $pdo->prepare("UPDATE posts SET status=?, reviewed_by=?, reviewed_at=NOW(), reject_reason=? WHERE id=?")
                 ->execute([$newStatus, $adminId, $reason ?: null, $id]);
 
-            // Notify user
             $p = $pdo->prepare("SELECT user_id FROM posts WHERE id=?");
             $p->execute([$id]);
             if ($po = $p->fetch()) {
@@ -92,50 +91,51 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     redirect('queue.php');
 }
 
+// Blocked content only (rejected + legacy pending rows from old REVIEW flow).
 $posts = $pdo->query("
     SELECT p.*, u.username, u.full_name, u.avatar_color
     FROM posts p JOIN users u ON p.user_id = u.id
-    WHERE p.status='pending'
+    WHERE p.status IN ('rejected', 'pending')
     ORDER BY p.ml_prob DESC, p.created_at ASC
 ")->fetchAll();
 
 $comments = $pdo->query("
     SELECT c.*, u.username, u.full_name, u.avatar_color
     FROM comments c JOIN users u ON c.user_id = u.id
-    WHERE c.status='pending'
+    WHERE c.status IN ('rejected', 'pending')
     ORDER BY c.ml_prob DESC, c.created_at ASC
 ")->fetchAll();
 
 $total = count($posts) + count($comments);
 
 $stats = [
-    'pending_posts'    => count($posts),
+    'blocked_posts'    => count($posts),
     'approved_posts'   => (int)$pdo->query("SELECT COUNT(*) FROM posts WHERE status='approved'")->fetchColumn(),
     'rejected_posts'   => (int)$pdo->query("SELECT COUNT(*) FROM posts WHERE status='rejected'")->fetchColumn(),
-    'pending_comments' => count($comments),
+    'blocked_comments' => count($comments),
 ];
 
-echo adminHead('Moderation Queue', false);
+echo adminHead('Blocked Content', false);
 echo adminSidebar();
 ?>
 <main class="main">
 
 <div class="ph">
     <div class="ph-left">
-        <h1>Moderation Queue</h1>
-        <p><?= $total ?> item<?= $total != 1 ? 's' : '' ?> awaiting review · sorted by ML risk</p>
+        <h1>Blocked Content</h1>
+        <p><?= $total ?> item<?= $total != 1 ? 's' : '' ?> forbidden by ML · sorted by risk</p>
     </div>
     <button onclick="location.reload()" class="btn btn-ghost btn-sm">↻ Refresh</button>
 </div>
 
 <div class="sg stat-4">
     <div class="sc">
-        <div class="sc-accent sc-amber"></div>
-        <div class="sc-icon sc-amber">
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
+        <div class="sc-accent sc-red"></div>
+        <div class="sc-icon sc-red">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
         </div>
-        <div class="sc-val"><?= $stats['pending_posts'] ?></div>
-        <div class="sc-lbl">Pending Posts</div>
+        <div class="sc-val"><?= $stats['blocked_posts'] ?></div>
+        <div class="sc-lbl">Blocked Posts</div>
     </div>
     <div class="sc">
         <div class="sc-accent sc-green"></div>
@@ -143,7 +143,7 @@ echo adminSidebar();
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>
         </div>
         <div class="sc-val"><?= $stats['approved_posts'] ?></div>
-        <div class="sc-lbl">Approved Posts</div>
+        <div class="sc-lbl">Allowed Posts</div>
     </div>
     <div class="sc">
         <div class="sc-accent sc-red"></div>
@@ -151,15 +151,15 @@ echo adminSidebar();
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
         </div>
         <div class="sc-val"><?= $stats['rejected_posts'] ?></div>
-        <div class="sc-lbl">Rejected Posts</div>
+        <div class="sc-lbl">Rejected (DB)</div>
     </div>
     <div class="sc">
-        <div class="sc-accent sc-amber"></div>
-        <div class="sc-icon sc-amber">
+        <div class="sc-accent sc-red"></div>
+        <div class="sc-icon sc-red">
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>
         </div>
-        <div class="sc-val"><?= $stats['pending_comments'] ?></div>
-        <div class="sc-lbl">Pending Comments</div>
+        <div class="sc-val"><?= $stats['blocked_comments'] ?></div>
+        <div class="sc-lbl">Blocked Comments</div>
     </div>
 </div>
 
@@ -170,7 +170,7 @@ echo adminSidebar();
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>
     </div>
     <h3>All clear!</h3>
-    <p>The moderation queue is empty. Great work.</p>
+    <p>No blocked posts or comments in the database. New forbidden content is stopped before publish.</p>
 </div>
 
 <?php else: ?>
@@ -178,7 +178,7 @@ echo adminSidebar();
 <?php if (!empty($posts)): ?>
 <div class="card">
     <div class="card-hd">
-        <h3>Pending Posts (<?= count($posts) ?>)</h3>
+        <h3>Blocked Posts (<?= count($posts) ?>)</h3>
         <span class="muted-sm">Sorted by ML risk ↓</span>
     </div>
     <?php foreach ($posts as $p):
@@ -193,7 +193,7 @@ echo adminSidebar();
             </div>
             <div class="queue-meta">
                 <div class="queue-username">@<?= htmlspecialchars($p['username']) ?></div>
-                <div class="queue-time"><?= timeAgo($p['created_at']) ?> · Post #<?= $p['id'] ?></div>
+                <div class="queue-time"><?= timeAgo($p['created_at']) ?> · Post #<?= $p['id'] ?> · <?= htmlspecialchars($p['status']) ?></div>
             </div>
             <div class="ml-meta">
                 <?php if ($isHarmful): ?>
@@ -218,17 +218,17 @@ echo adminSidebar();
                 <input type="hidden" name="action" value="approve">
                 <button type="submit" class="btn btn-success btn-sm">
                     <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>
-                    Approve
+                    Allow (override)
                 </button>
             </form>
             <form method="POST" class="inline-form">
                 <input type="hidden" name="id"     value="<?= $p['id'] ?>">
                 <input type="hidden" name="type"   value="post">
                 <input type="hidden" name="action" value="reject">
-                <input type="text" name="reason" class="form-input input-sm" placeholder="Rejection reason (optional)">
+                <input type="text" name="reason" class="form-input input-sm" placeholder="Reason (optional)">
                 <button type="submit" class="btn btn-danger btn-sm">
                     <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
-                    Reject
+                    Keep forbidden
                 </button>
             </form>
         </div>
@@ -240,7 +240,7 @@ echo adminSidebar();
 <?php if (!empty($comments)): ?>
 <div class="card">
     <div class="card-hd">
-        <h3>Pending Comments (<?= count($comments) ?>)</h3>
+        <h3>Blocked Comments (<?= count($comments) ?>)</h3>
         <span class="muted-sm">Sorted by ML risk ↓</span>
     </div>
     <?php foreach ($comments as $c):
@@ -274,7 +274,7 @@ echo adminSidebar();
                 <input type="hidden" name="action" value="approve">
                 <button type="submit" class="btn btn-success btn-sm">
                     <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>
-                    Approve
+                    Allow (override)
                 </button>
             </form>
             <form method="POST">
@@ -283,7 +283,7 @@ echo adminSidebar();
                 <input type="hidden" name="action" value="reject">
                 <button type="submit" class="btn btn-danger btn-sm">
                     <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
-                    Reject
+                    Keep forbidden
                 </button>
             </form>
         </div>

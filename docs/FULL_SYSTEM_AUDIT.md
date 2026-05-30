@@ -1,887 +1,748 @@
-# ApexSocial — Full System & Technology Audit
+# ApexSocial — Full Technical System Audit
 
-**Project:** `c:\xampp\htdocs\apexsocial`  
-**Audit date:** 2026-05-20  
-**Version referenced:** ML API v6.1, Trainer v6.0  
-**Scope:** Every technology layer + maximum detail on Machine Learning  
+| Field | Value |
+|-------|--------|
+| **Document** | `docs/FULL_SYSTEM_AUDIT.md` |
+| **Audit date** | 2026-05-28 |
+| **Revision** | 2 (full refresh) |
+| **Repository** | `c:\xampp\htdocs\apexsocial` |
+| **Remote** | `https://github.com/arjanitpronaj/apexsocial.git` |
+| **Last commit (local)** | `edf597a` — Initialize ApexSocial local repository and sync latest platform updates |
+| **Scope** | PHP web app, Python ML + realtime, MySQL, admin panel, legacy C# backend, assets, docs |
+| **Method** | Static review of source, configs, SQL schema, dependency manifests, cross-doc consistency |
 
----
-
-## Table of contents
-
-1. [Executive summary](#1-executive-summary)
-2. [Services & ports](#2-services--ports)
-3. [Architecture diagram](#3-architecture-diagram)
-4. [Technology inventory](#4-technology-inventory)
-5. [PHP application layer](#5-php-application-layer)
-6. [MySQL database layer](#6-mysql-database-layer)
-7. [Python ML API (Flask)](#7-python-ml-api-flask)
-8. [Machine Learning — complete pipeline](#8-machine-learning--complete-pipeline)
-9. [Training system](#9-training-system)
-10. [Online / incremental learning](#10-online--incremental-learning)
-11. [Real-time system (WebSocket)](#11-real-time-system-websocket)
-12. [Frontend JavaScript](#12-frontend-javascript)
-13. [Legacy C# backend](#13-legacy-c-backend)
-14. [Security audit](#14-security-audit)
-15. [Data files & artifacts](#15-data-files--artifacts)
-16. [End-to-end flows](#16-end-to-end-flows)
-17. [Known bugs & inconsistencies](#17-known-bugs--inconsistencies)
-18. [Operational checklist](#18-operational-checklist)
-19. [Recommendations (prioritized)](#19-recommendations-prioritized)
+> **Canonical audit file.** Use this document for thesis documentation, onboarding, and security review.  
+> Dated snapshot: `docs/FULL_SYSTEM_AUDIT_2026-05-28.md` (same revision).
 
 ---
 
-## 1. Executive summary
+## Table of Contents
 
-ApexSocial is a **social network** built on **PHP + MySQL**, with **content moderation** delegated to a **Python microservice** using **scikit-learn**. A second Python process provides **WebSocket real-time** notifications and live ML preview. The system is **hybrid**: ML models, keyword lists, URL heuristics, Unicode integrity checks, optional transformer semantics, and linguistic context rules.
-
-| What works today (authoritative) | What is broken or misaligned |
-|--------------------------------|-----------------------------|
-| PHP → `:5000/analyze` for all moderation | Browser still uses **SignalR** client; server speaks **native WebSocket** |
-| Posts/comments stored with ML metadata | `api.py` calls undefined `_record_sample_and_maybe_retrain()` → can crash `/analyze` |
-| Admin queue + pending/review flow | `BACKEND_URL` points to push port **8081**, but UI expects **WS :8080** |
-| Offline training via `train_model.py` | C# `Backend/` still in repo but unused by PHP |
-
----
-
-## 2. Services & ports
-
-| Service | Technology | Bind address | Port | Start command |
-|---------|------------|--------------|------|---------------|
-| Web + PHP | Apache (XAMPP) | `HTTP_HOST` | 80 | XAMPP |
-| Database | MySQL 8 | `127.0.0.1` | 3306 | XAMPP MySQL |
-| **ML API** | Flask + Waitress | `0.0.0.0` | **5000** | `python api.py` |
-| **WebSocket** | `websockets` + asyncio | `0.0.0.0` | **8080** | `python ws_server.py` |
-| **HTTP Push** | `aiohttp` | `0.0.0.0` | **8081** | (same process as WS) |
-| Legacy hub | C# SignalR (optional) | `0.0.0.0` | 8080 | `dotnet run` — **conflicts with WS** |
-
-**Constants (PHP):**
-
-| Constant | Value | Meaning |
-|----------|-------|---------|
-| `ML_API_URL` | `http://127.0.0.1:5000` | ML classification |
-| `BACKEND_URL` | `http://{HTTP_HOST}:8081` | Push API only (via `realtime.php`) |
-| `REALTIME_PUSH_KEY` | `apex-ws-key-2025` | Push authentication |
+1. [Executive Summary](#1-executive-summary)
+2. [Authoritative Runtime Architecture](#2-authoritative-runtime-architecture-critical)
+3. [Technology Stack](#3-technology-stack-analysis)
+4. [Frontend Audit](#4-frontend-audit)
+5. [Backend (PHP) Audit](#5-backend-php-audit)
+6. [Database Audit](#6-database-audit)
+7. [API & Communication](#7-api--communication-audit)
+8. [Machine Learning / AI](#8-machine-learning--ai-audit)
+9. [Realtime Subsystem](#9-realtime-subsystem)
+10. [Authentication & Security](#10-authentication--security-audit)
+11. [DevOps & Infrastructure](#11-devops--infrastructure-audit)
+12. [Performance](#12-performance-audit)
+13. [Code Quality](#13-code-quality-audit)
+14. [Dependencies](#14-dependency-audit)
+15. [System Flows](#15-system-flow-documentation)
+16. [File Structure](#16-file-structure-audit)
+17. [Documentation Index & Drift](#17-documentation-index--drift-matrix)
+18. [Security Risk Matrix](#18-security-risk-matrix)
+19. [Improvement Recommendations](#19-improvement-recommendations)
+20. [Final Technical Evaluation](#20-final-technical-evaluation)
+21. [Appendices](#21-appendices)
 
 ---
 
-## 3. Architecture diagram
+## 1. Executive Summary
+
+### 1.1 System Overview
+
+**ApexSocial** is a content-moderated social platform for posts, comments, likes, friendships, notifications, user reports, and an admin moderation queue. Harmful content (hate speech, scams/phishing) is detected by a **hybrid Python ML service** integrated with PHP.
+
+### 1.2 Main Purpose
+
+- Social interaction (feed, profile, explore, saved, friends).
+- **AI-assisted moderation** before and during publish (binary **ALLOWED** / **FORBIDDEN**).
+- Admin review, feedback loop to ML, scheduled/incremental retraining.
+- Realtime notifications and live moderation preview via **Python WebSocket** (not C# SignalR in the active path).
+
+### 1.3 Overall Architecture (Authoritative)
 
 ```mermaid
 flowchart TB
-    subgraph Client["Browser"]
-        APP[app.js - composer ML]
-        RT[realtime.js - events]
+    subgraph Browser
+        UI[PHP pages + app.js + realtime.js]
     end
-
-    subgraph PHP["PHP / XAMPP"]
-        CFG[config.php]
-        AJAX[ajax.php]
-        IDX[index.php]
-        RTPHP[realtime.php]
-        SAN[sanitize.php]
-    end
-
-    subgraph DB["MySQL utf8mb4"]
-        T1[users]
-        T2[posts / comments]
-        T3[content_analysis]
-        T4[notifications]
-    end
-
-    subgraph ML["Python ml_api"]
-        API[api.py :5000]
-        TRAIN[train_model.py]
-        WS[ws_server.py]
-        MOD1[pipeline.pkl]
-        MOD2[scam_pipeline.pkl]
-    end
-
-    APP -->|POST moderate_content| AJAX
-    APP -.->|SignalR - WRONG protocol| WS
-    RT -.->|should be WS :8080| WS
-    AJAX --> CFG
-    IDX --> CFG
-    CFG -->|curl POST /analyze| API
-    RTPHP -->|curl POST /api/push| WS
-    CFG --> SAN
-    AJAX --> DB
-    IDX --> DB
-    API --> MOD1
-    API --> MOD2
-    TRAIN --> MOD1
-    TRAIN --> MOD2
-    WS -->|run_in_executor| API
+    UI -->|HTML / JSON actions| PHP[Apache + PHP]
+    PHP -->|PDO| DB[(MySQL apexsocial)]
+    PHP -->|POST /analyze| ML[Flask ML API :5000]
+    UI -->|WebSocket| WS[ws_server.py :8080]
+    PHP -->|POST /api/push| PUSH[HTTP bridge :8081]
+    PUSH --> WS
+    ML --> ART[(models/*.pkl + config.json + JSONL)]
+    ADM[admin/*.php] --> PHP
+    SCH[scheduler.py] -->|subprocess| TRAIN[train_model.py]
+    SCH -->|POST| ML
 ```
 
-**Authoritative moderation path:**
+### 1.4 Top Findings
 
-```
-User / PHP  →  HTTP POST 127.0.0.1:5000/analyze  →  JSON verdict
-```
+| # | Finding | Severity |
+|---|---------|----------|
+| 1 | **README and some docs still describe C# Singular Core as central**; runtime uses **PHP → ML direct** and **Python WS** on 8080/8081 | High (operational drift) |
+| 2 | **Plaintext passwords** in schema and auth (by explicit project requirement in `database.sql`) | Critical (production) |
+| 3 | **No CSRF** on state-changing `ajax.php` actions | Critical |
+| 4 | **XSS risk** via `innerHTML` templates in `app.js` for dynamic content | High |
+| 5 | **CSP includes `unsafe-eval`** (compatibility workaround) | Medium–High |
+| 6 | ML pipeline is **mature and well-structured**; governance of pickle artifacts and feedback data is weak | Medium |
+| 7 | **No CI/CD**, no pinned Python lockfile, WS deps (`websockets`, `aiohttp`) not in `requirements.txt` | Medium |
+| 8 | Monolithic `style.css` (~1684 lines) and `app.js` (~755 lines) increase regression risk | Medium |
 
-**Not used for moderation:**
+### 1.5 Technical Maturity
 
-```
-PHP  →  C# :8080  →  ML   (legacy, exists in repo only)
-```
+| Label | Assessment |
+|-------|------------|
+| **Stage** | Advanced prototype / pre-production |
+| **Feature completeness** | High |
+| **Production safety** | Low–medium until auth, CSRF, XSS, secrets are hardened |
+| **ML subsystem** | Strong relative to rest of stack |
 
 ---
 
-## 4. Technology inventory
+## 2. Authoritative Runtime Architecture (Critical)
 
-### 4.1 Languages & runtimes
+This section is the **single source of truth** for how the system runs today. Several older files contradict it.
 
-| Technology | Version / notes | Where |
-|------------|-----------------|-------|
-| PHP | 8.x (XAMPP) | `*.php`, `includes/`, `pages/`, `admin/` |
-| JavaScript | ES5-style, no bundler | `assets/js/` |
-| Python | 3.10+ recommended | `ml_api/` |
-| SQL | MySQL 8 dialect | `database.sql` |
-| C# | .NET 8 (legacy) | `Backend/` |
+### 2.1 Active Services
 
-### 4.2 Python dependencies (`ml_api/requirements.txt`)
+| Service | Entry point | Port | Role |
+|---------|-------------|------|------|
+| Apache + PHP | XAMPP `htdocs/apexsocial` | 80 | Web UI, `ajax.php`, admin |
+| MySQL | XAMPP | 3306 | Persistence |
+| ML API | `ml_api/api.py` (Waitress) | **5000** | `/analyze`, training admin endpoints |
+| WebSocket | `ml_api/ws_server.py` | **8080** | Client WS, `preview_moderation` |
+| HTTP push bridge | `ml_api/ws_server.py` (aiohttp) | **8081** | `POST /api/push` from PHP |
+| Scheduler | `ml_api/scheduler.py` | — | Nightly incremental + weekly full retrain |
+| C# backend (legacy) | `Backend/Program.cs` | 8080 (conflict) | **Not authoritative**; conflicts with Python WS port |
 
-| Package | Role |
-|---------|------|
-| `flask` | HTTP API |
-| `flask-cors` | CORS for browser (if called directly) |
-| `scikit-learn` | TF-IDF + LogisticRegression + calibration |
-| `pandas` | Training data loading |
-| `numpy` | ML numerics |
-| `openpyxl` | Excel datasets |
-| `waitress` | Production WSGI on Windows |
-| `websockets` | WS server (not in requirements.txt — **should be added**) |
-| `aiohttp` | Push HTTP server (not in requirements.txt — **should be added**) |
-| `transformers` + `torch` | Optional — semantic layer |
+### 2.2 Moderation Authority Chain
 
-### 4.3 Frontend libraries (CDN)
+1. **Browser:** 10s inactivity countdown → optional WS preview (`realtime.js`) → submit.
+2. **PHP:** `moderateContent()` → `mlAnalyze()` → `POST http://127.0.0.1:5000/analyze`.
+3. **Python:** `analyze()` hybrid pipeline → verdict.
+4. **PHP:** If `FORBIDDEN` or ML offline (fail-closed) → block persist; else INSERT post/comment.
+5. **Admin:** `admin/queue.php` → approve/reject → `POST /feedback` for online learning.
 
-| Library | File | Purpose |
-|---------|------|---------|
-| Microsoft SignalR 8.0.0 | `navbar.php`, `admin/inc_sidebar.php` | **Outdated** — server no longer SignalR |
+**Verdicts:** `ALLOWED`, `FORBIDDEN`, `REJECTED` (integrity failure), `OFFLINE` (PHP when ML unreachable).
 
----
+There is **no** end-user `REVIEW` publish state in the ML API (`borderline_review_only: false` in config).
 
-## 5. PHP application layer
+### 2.3 What README Claims vs Reality
 
-### 5.1 Core files
+| README (`README.md`) | Actual code |
+|----------------------|-------------|
+| PHP never calls Python directly | **`includes/config.php` calls ML via cURL** |
+| C# Singular Core on :8080 | **`ws_server.py` binds :8080** |
+| SignalR realtime | **`websockets` + push bridge** |
+| Plain text passwords “as required” | **Still true in DB** |
 
-| File | Responsibility |
-|------|----------------|
-| `includes/config.php` | PDO, sessions, `ML_API_URL`, `BACKEND_URL`, `mlAnalyze()`, `moderateContent()`, `analyzeContent()`, `logAnalysis()` |
-| `includes/ajax.php` | All AJAX actions (moderation preview, comments, likes, friends, repost) |
-| `includes/realtime.php` | Push events to Python `:8081/api/push` |
-| `includes/sanitize.php` | XSS validation on input; `apex_e()` for HTML escape on output |
-| `includes/navbar.php` | Global JS vars, SignalR CDN, `realtime.js` |
-| `index.php` | Feed, composer, post creation with server-side ML |
-| `admin/queue.php` | Moderation queue (`pending` posts/comments) |
-| `admin/*.php` | Stats, users, harmful content, ML stats |
+**Action:** Update `README.md` and `docs/REALTIME_ARCHITECTURE.md` to match Section 2 or mark C# as deprecated optional module.
 
-### 5.2 ML bridge functions (`config.php`)
+### 2.4 Startup Checklist (Windows / XAMPP)
 
-#### `mlAnalyze($text, $userId, $type)`
-
-- **Method:** cURL POST JSON to `{ML_API_URL}/analyze`
-- **Body:** `{ "text", "user_id", "type" }`
-- **Timeout:** 10s connect 4s
-- **Failure:** returns `{ offline: true, verdict: 'OFFLINE' }`
-
-#### `moderateContent($text, ...)`
-
-- Empty/short text → `ALLOWED` without calling ML
-- ML offline → **fail-closed** (user cannot post)
-
-#### `mlVerdictBlocks($verdict)`
-
-Returns true for: `FORBIDDEN`, `REVIEW`
-
-#### `analyzeContent($text, ...)`
-
-Wraps `moderateContent()` into DB-friendly shape: `label` 0/1, `safe`, `harmful_prob`, etc.
-
-#### `logAnalysis($pdo, ...)`
-
-Inserts row into MySQL `content_analysis`.
-
-### 5.3 Post creation logic (`index.php`)
-
-| ML verdict | DB `posts.status` | Real-time |
-|------------|-------------------|-----------|
-| `ALLOWED` | `approved` | — |
-| `REVIEW` | `pending` | `apexNewPending()` → admins |
-| `FORBIDDEN` | (no insert) | — |
-| Offline | (no insert) | — |
-
-Raw `content` stored **as typed** (not HTML-encoded). XSS checked via `apexValidateUserText()` before insert.
-
-### 5.4 AJAX moderation preview (`ajax.php` → `moderate_content`)
-
-Used by composer live check:
-
-```http
-POST /includes/ajax.php
-action=moderate_content
-text=...
+```text
+1. Start Apache + MySQL (XAMPP)
+2. Import database.sql if needed
+3. cd ml_api && pip install -r requirements.txt
+4. pip install websockets aiohttp   # required for ws_server; not in requirements.txt
+5. python train_model.py            # first-time / after dataset changes
+6. python api.py                    # :5000
+7. python ws_server.py              # :8080 + :8081
+8. python scheduler.py              # optional automated retrain
 ```
 
-Returns JSON: `status`, `reason`, `harmful_prob`, `category`, `method`, `integrity`, `language_hint`.
-
-### 5.5 Real-time push (`realtime.php`)
-
-| Function | Event name | Target |
-|----------|------------|--------|
-| `apexNotifyUser()` | `Notification` | `user_{id}` |
-| `apexModerationResult()` | `ModerationResult` | author |
-| `apexNewPending()` | `NewPending` | `admins` |
-| `apexQueueUpdate()` | `QueueUpdate` | `admins` |
-| `apexUserBanned()` | `Banned` | user |
-
-All use `apexRealtimePush()` → `POST http://{host}:8081/api/push` with header `X-Api-Key: apex-ws-key-2025`.
+Do **not** run C# Backend on 8080 concurrently with `ws_server.py`.
 
 ---
 
-## 6. MySQL database layer
+## 3. Technology Stack Analysis
 
-**Schema file:** `database.sql`  
-**Charset:** `utf8mb4_unicode_ci`
+| Layer | Technology | Version / notes | Purpose | Primary risks |
+|-------|------------|-----------------|---------|---------------|
+| Web | XAMPP Apache + PHP 8-style | Local dev | Pages, sessions, uploads | Weak prod hardening |
+| DB | MySQL 8 | utf8mb4 | Social + moderation data | Plaintext passwords, index gaps |
+| ML API | Flask + Waitress | `flask>=2.3` | Inference + ops endpoints | Open bind, pickle load |
+| ML | scikit-learn, pandas, numpy | min versions in requirements | TF-IDF + logistic | Unpinned versions |
+| Schedule | APScheduler | `>=3.10` | Retrain cron | Process not supervised |
+| Realtime | websockets, aiohttp | **implicit** | WS + push | Missing from requirements.txt |
+| Legacy | ASP.NET Core 8 + SignalR | `Backend/` | Alternate stack | Port/doc conflict |
+| Frontend | Vanilla JS, CSS | No bundler | UI + moderation UX | XSS, monolithic assets |
+| Fonts | Google Fonts (Inter) | CDN | Typography | CSP external dependency |
 
-### 6.1 Tables relevant to ML
+No Composer, npm, Docker, or GitHub Actions detected in repository (~136 tracked files).
 
-#### `posts`
+---
 
-| Column | Type | Meaning |
+## 4. Frontend Audit
+
+### 4.1 Structure
+
+| Asset | Lines (approx.) | Responsibility |
+|-------|-----------------|----------------|
+| `assets/js/app.js` | 755 | Feed, composer, comments, moderation UX, reports, search |
+| `assets/js/realtime.js` | — | WebSocket connect, preview, event handlers |
+| `assets/css/style.css` | 1684 | Global UI, mobile responsive block, design tokens |
+| `assets/css/admin.css` | — | Admin panel styles |
+
+Pages: `index.php`, `pages/*` (login, register, profile, friends, notifications, settings, saved, explore, banned), `admin/*`.
+
+### 4.2 Moderation UX (Current)
+
+- **10-second inactivity countdown** before ML check (`COUNTDOWN_SEC = 10` in `app.js`).
+- Status states: idle → countdown → analyzing → allowed/forbidden/offline.
+- WebSocket path for faster preview when `realtime.js` connected.
+- Post button disabled until moderation completes successfully.
+
+### 4.3 Recent UI Features (Rev 2)
+
+- **Inter** font via Google Fonts (multiple PHP pages).
+- **Mobile navigation** and responsive CSS breakpoints (640–1000px).
+- **Report content** on posts and comments (`openReport()`).
+- CSS refresh: variables, post cards, navbar, composer.
+
+### 4.4 Security (Frontend)
+
+| Issue | Detail |
+|-------|--------|
+| XSS | Dynamic HTML via `innerHTML` for comments, search, avatars |
+| CSP | `script-src` includes `'unsafe-inline'` and `'unsafe-eval'` in `config.php` |
+| WS token | HMAC token from PHP; verified in `ws_server.py` |
+
+### 4.5 Recommendations
+
+- Split `app.js` into modules (moderation, social, reports).
+- Replace `innerHTML` with safe DOM APIs or strict escaping layer.
+- Self-host fonts; tighten CSP after removing `unsafe-eval` root cause.
+
+---
+
+## 5. Backend (PHP) Audit
+
+### 5.1 Core Files
+
+| File | Role |
+|------|------|
+| `includes/config.php` | DB, session, CSP, `moderateContent()`, `mlAnalyze()`, helpers |
+| `includes/ajax.php` | JSON action router (~269 lines) |
+| `includes/sanitize.php` | XSS payload detection, text validation, `apex_e()` |
+| `includes/realtime.php` | Push bridge to :8081 |
+| `includes/navbar.php` | Shared navigation |
+
+### 5.2 AJAX Actions (`includes/ajax.php`)
+
+| Action | Auth | Purpose |
 |--------|------|---------|
-| `status` | `pending \| approved \| rejected` | Publication state |
-| `ml_label` | TINYINT | 0 safe, 1 harmful signal |
-| `ml_prob` | FLOAT | Display/harm probability |
-| `ml_category` | VARCHAR(30) | e.g. `hate_speech`, `phishing_scam`, `safe` |
-| `ml_method` | VARCHAR(20) | e.g. `sklearn`, `hybrid` |
+| `moderate_content` | User | Pre-submit ML check |
+| `toggle_like` | User | Like/unlike |
+| `add_comment` | User | Comment + ML |
+| `load_comments` | User | Fetch thread |
+| `delete_comment` | User | Soft delete |
+| `delete_post` | User | Delete own post |
+| `friend_request` | User | Send request |
+| `respond_friend` | User | Accept/reject |
+| `search` | User | User search |
+| `repost` | User | Repost with ML |
+| `report_content` | User | User report |
 
-#### `comments`
+**Gap:** No CSRF token validation on any action.
 
-Same ML columns as posts.
+### 5.3 ML Integration (`config.php`)
 
-#### `content_analysis`
-
-Audit log: `text_snapshot`, `label`, `harmful_prob`, `confidence`, `category`, `method`, per `content_type` + `content_id`.
-
-#### `notifications`
-
-User-facing events (likes, approvals, friend requests). Populated by PHP; delivery via WebSocket push if client connected.
-
-### 6.2 Status workflow
-
-```
-REVIEW verdict  →  pending  →  admin queue  →  approved | rejected
-ALLOWED verdict →  approved (immediate publish)
-FORBIDDEN       →  no row (blocked at composer or index.php)
+```php
+// PHP calls ML directly (authoritative)
+ML_API_URL = 'http://127.0.0.1:5000'
+moderateContent() → mlAnalyze() → POST /analyze
 ```
 
----
+- **Fail-closed:** If ML offline → `FORBIDDEN` with user-facing message (posting blocked).
+- **Logging:** `logAnalysis()` → `content_analysis` table (errors swallowed in empty catch).
 
-## 7. Python ML API (Flask)
+### 5.4 Admin Panel
 
-**File:** `ml_api/api.py`  
-**Server:** Waitress, 8 threads, `0.0.0.0:5000`  
-**Version string:** 6.1
-
-### 7.1 Module dependency graph
-
-```
-api.py
-├── apex_log.py          → file logging
-├── security.py          → rate limit, spam, request validation
-├── text_integrity.py    → Unicode / bypass preprocessing
-├── text_utils.py        → ml_features, keywords, URLs
-├── context_scoring.py   → negation, borderline dampening
-├── semantic_scorer.py   → optional DistilBERT
-└── online_learning.py   → jsonl log + auto-retrain
-```
-
-### 7.2 HTTP endpoints
-
-| Route | Method | Auth | Description |
-|-------|--------|------|-------------|
-| `/analyze` | POST | Security middleware | Main classification |
-| `/analyze_batch` | POST | Security middleware | Up to 200 items |
-| `/integrity/check` | POST | Security middleware | Integrity debug |
-| `/health` | GET | None | Models loaded, config stats |
-| `/stats` | GET | None | Analysis log aggregates |
-| `/retrain` | POST | Security middleware | Background incremental train |
-| `/reload_models` | POST | Security middleware | Hot-reload pickles |
-| `/test` | POST | Security middleware | Batch test strings |
-
-### 7.3 Security middleware (`security.py`)
-
-Applied via `@_secured` decorator on routes:
-
-- Max body 512 KB
-- Rate limit: 120/min general, 60/min on `/analyze`
-- Flood window: 25 requests / 10 seconds
-- JSON sanitization (XSS/template patterns in body)
-- Spam score on long repetitive text
-- Rejections logged to `models/rejected_inputs.jsonl`
-
-### 7.4 CORS
-
-Explicit origins from `config.json` or `APEX_CORS_ORIGINS` env — **not** wildcard with credentials.
-
-### 7.5 Models in memory
-
-| Variable | File | Fallback |
-|----------|------|----------|
-| `hate_pipeline` | `models/pipeline.pkl` | `None` → ML score 0 |
-| `scam_pipeline` | `models/scam_pipeline.pkl` | copy of hate pipeline |
-
-Access guarded by `threading.RLock()` for hot-reload.
-
----
-
-## 8. Machine Learning — complete pipeline
-
-This is the **core** of ApexSocial moderation.
-
-### 8.1 Configuration (`models/config.json`)
-
-| Key | Default | Role |
-|-----|---------|------|
-| `threshold_low` | 0.52 | Min combined % for any action |
-| `threshold_high` | 0.78 | Auto-block band (unless context review) |
-| `borderline_review_only` | true | Prefer REVIEW over FORBIDDEN in gray zone |
-| `keywords` | ~75 strings | Hate/harassment keyword list |
-| `scam_keywords` | ~100 strings | Phishing/scam keywords |
-| `keyword_boost_strong` | 25 | Multi-word keyword add to % |
-| `keyword_boost_weak` | 16 | Single-word keyword add |
-| `bypass_boost` | 18 | Integrity bypass add |
-| `retrain_min_samples` | 10 | Min lines before auto-retrain allowed |
-| `retrain_every_n` | 8 | New lines between auto-retrains |
-| `semantic_enabled` | true | Try transformers if installed |
-| `security` | object | Rate limits (see security.py) |
-
-### 8.2 Stage 1 — Text integrity (`text_integrity.py`)
-
-**Function:** `prepare_text(raw, strict=False)`
-
-| Step | What it does |
-|------|----------------|
-| Structure validation | Empty, too long (>8000), control chars, corruption ratio |
-| NFKC normalization | Unicode canonical form |
-| Invisible char removal | Zero-width, BOM, bidi overrides |
-| Homoglyph folding | Cyrillic/Greek/fullwidth → Latin |
-| Leet symbol map | `@→a`, `0→o`, etc. |
-| Masked words | `h@te`, `sh!t` collapsed |
-| Script detection | latin, arabic, cjk, mixed → flags |
-| Output | `IntegrityResult` with `ml_text`, `flags`, `bypass_score` |
-
-**On strict failure:** HTTP 400, verdict `REJECTED`.
-
-### 8.3 Stage 2 — Feature extraction (`text_utils.py`)
-
-**Function:** `ml_features(text)` (alias `clean()`)
-
-| Operation | Preserves Unicode? |
-|-----------|-------------------|
-| Strip control bytes 0x00–0x1F (keep `\n` `\t`) | Yes |
-| URL → token `url` | Yes |
-| @mention → `user` | Yes |
-| Collapse 2+ spaces (ML only) | N/A |
-| **Does NOT** strip non-Latin letters | Yes — CJK, Arabic, ë, ç kept |
-
-**Keyword matching:** `keyword_match(text, kw_list)`
-
-- Scans lowercase + leet-normalized form
-- **Negation lookback:** 3 tokens — `"not hate"` does not match hate keyword
-- Phrase and single-word patterns
-
-**URL scam boost:** `url_scam_boost(text)` on **raw** text (0–35 points)
-
-- Suspicious TLDs (`.xy`, `.tk`, …)
-- Scam context words near links
-
-### 8.4 Stage 3 — ML inference (scikit-learn)
-
-**Input:** `ml_features(raw)` string  
-**Models:** `hate_pipeline`, `scam_pipeline`
-
-**Pipeline structure (inside each `.pkl`):**
-
-```
-TfidfVectorizer(
-  analyzer = "char_wb",
-  ngram_range = (3, 5),
-  max_features = 30000,
-  lowercase = False,
-)
-→
-CalibratedClassifierCV(
-  estimator = LogisticRegression(saga, balanced),
-  method = "sigmoid",
-  cv = 2–5 folds by dataset size,
-)
-```
-
-**Output:** `predict_proba` → P(harmful) ∈ [0, 1] per model
-
-**Why char_wb:** Word-level TF-IDF with ASCII `token_pattern` destroyed Arabic/CJK and obfuscation. Character n-grams are slower but multilingual.
-
-### 8.5 Stage 4 — Context scoring (`context_scoring.py`)
-
-**Function:** `apply_context_to_probs(text, hate_p, scam_p, thresh_low, thresh_high)`
-
-| Rule | Effect |
-|------|--------|
-| `adjust_ml_probs` | Negated "hate", safe phrases ("anti-hate", "hate speech" as topic) |
-| Question form | ×0.75 dampen |
-| Quoted + reporting context | ×0.55 dampen |
-| Multi-sentence negation | ×0.65 dampen |
-| Score between thresholds | `force_review = True` |
-
-### 8.6 Stage 5 — Semantic layer (`semantic_scorer.py`) — optional
-
-**Model (if installed):** `distilbert-base-uncased-finetuned-sst-2-english`
-
-| Component | Role |
-|-----------|------|
-| Policy regex | Threats, hate patterns, harassment |
-| SST-2 sentiment | Negative tone → harm boost |
-| Combined | `max(neg_prob * 0.55, policy_boost)` |
-
-If `transformers` not installed: **regex policy only**, logged once as WARNING.
-
-### 8.7 Stage 6 — Score fusion
-
-```
-hate_combined = min(100,
-    hate_ml% + keyword_weight_hate + bypass_score * 0.35)
-
-scam_combined = min(100,
-    scam_ml% + keyword_weight_scam + url_boost + bypass_score * 0.25)
-```
-
-Pick dominant branch → category `hate_speech` or `phishing_scam`.
-
-**Special:** High URL boost + suspicious TLD → scam_combined forced ≥ threshold_high.
-
-**Display probability:** `_sigmoid_sharpen()` on raw ML prob when method is `sklearn`.
-
-### 8.8 Stage 7 — Verdict decision
-
-```
-IF combined < 52%        → ALLOWED
-IF keyword hit           → FORBIDDEN (immediate)
-IF score ≥ 78%         → FORBIDDEN (unless borderline context without keyword)
-IF 52–78% + context    → REVIEW
-ELSE borderline        → REVIEW
-```
-
-**Response JSON fields (main):**
-
-| Field | Example |
-|-------|---------|
-| `verdict` | `ALLOWED`, `FORBIDDEN`, `REVIEW`, `REJECTED` |
-| `category` | `safe`, `hate_speech`, `phishing_scam` |
-| `harmful_prob` | 0–100 display scale |
-| `method` | `sklearn`, `hybrid` |
-| `reason` | Human-readable |
-| `confidence` | `low`, `medium`, `high` |
-| `ml_hate_pct`, `ml_scam_pct` | Raw ML % |
-| `combined_score` | Fused % |
-| `integrity` | Flags, language_hint |
-| `context_notes` | e.g. `negated_hate` |
-
----
-
-## 9. Training system
-
-**File:** `ml_api/train_model.py`
-
-### 9.1 Modes
-
-| Command | Behavior |
-|---------|----------|
-| `python train_model.py` | Full train: hate + scam from static CSVs |
-| `python train_model.py --incremental` | Merge `user_inputs.jsonl` + samples |
-
-### 9.2 Hate model data (full)
-
-| Source | Path | Columns |
-|--------|------|---------|
-| Primary | `models/labeled_data.csv` | `tweet`, `class` (2=safe, else harmful) |
-| User data | `models/user_inputs.jsonl` | `text`, `label`, `category` |
-| Sample | writes `models/dataset.csv` | 500 safe + 500 harmful sample |
-
-### 9.3 Scam model data
-
-Searched under `models/datasets/`:
-
-| Pattern | Dataset |
-|---------|---------|
-| scam, spam, sms | `scam.csv` |
-| malicious | `malicious_phish.csv` |
-| phiusiil | `PhiUSIIL_Phishing_URL_Dataset.csv` |
-
-### 9.4 Training steps per model
-
-1. Load & merge dataframes  
-2. `clean()` / `ml_features()` on all text  
-3. `repair_user_label_noise()` — keyword-hit rows labeled 0 → 1  
-4. `balance_dataset()` — majority downsampled to 3:1 max  
-5. `train_test_split` 80/20 stratified  
-6. `build_pipeline(n)` → fit  
-7. Print accuracy, precision, recall, F1  
-8. Save `pipeline.pkl` or `scam_pipeline.pkl`  
-
-### 9.5 Vectorizer (must match inference)
-
-```python
-TfidfVectorizer(
-    analyzer="char_wb",
-    ngram_range=(3, 5),
-    max_features=30000,
-    sublinear_tf=True,
-    lowercase=False,
-)
-```
-
-**After changing vectorizer:** delete old `.pkl` and run full train.
-
----
-
-## 10. Online / incremental learning
-
-**File:** `ml_api/online_learning.py`
-
-### 10.1 Intended behavior
-
-| Step | Action |
-|------|--------|
-| 1 | Every `/analyze` appends to `user_inputs.jsonl` |
-| 2 | Label: ALLOWED→0, FORBIDDEN/REVIEW→1 |
-| 3 | Text stored as `ml_features(text)` |
-| 4 | When `total - last_retrain ≥ 8` → subprocess `train_model.py --incremental` |
-| 5 | On success → `_load_models()` in API process |
-
-**State:** `models/online_state.json`
-
-### 10.2 Current code defect (critical)
-
-`api.py` line ~416 calls:
-
-```python
-_record_sample_and_maybe_retrain(text, result["verdict"], ...)
-```
-
-**This function is NOT defined** in `api.py`. Imports exist but wrapper missing.
-
-**Impact:** `NameError` on every analyze → PHP sees ML offline.
-
-**Separate bug:** `route_analyze_batch` still calls `_append_training_input()` which uses undefined name `clean` (should be `ml_features`).
-
----
-
-## 11. Real-time system (WebSocket)
-
-**File:** `ml_api/ws_server.py`  
-**Do NOT use SignalR.**
-
-### 11.1 Ports
-
-| Port | Protocol |
+| Page | Function |
 |------|----------|
-| 8080 | WebSocket `ws://host:8080` |
-| 8081 | HTTP `POST /api/push` |
+| `admin/index.php` | Dashboard |
+| `admin/queue.php` | Pending moderation + ML feedback |
+| `admin/posts.php`, `all_posts.php` | Post management |
+| `admin/users.php` | Users, ban |
+| `admin/reports.php` | User reports |
+| `admin/harmful.php` | Harmful content log |
+| `admin/ml_stats.php` | ML statistics |
+| `admin/dataset.php`, `scan.php`, `activity.php` | Ops tools |
 
-### 11.2 Client → server messages
+### 5.5 Uploads
 
-```json
-{"type":"join","user_id":123,"is_admin":false}
-{"type":"ping"}
-{"type":"preview_moderation","text":"user typed content"}
-```
-
-### 11.3 Server → client messages
-
-```json
-{"type":"joined","user_id":123,"is_admin":false}
-{"type":"pong"}
-{"type":"live_moderation","verdict":"ALLOWED","harmful_prob":12.3,"category":"safe","method":"sklearn","reason":"...","offline":false}
-{"type":"notification","payload":{...}}
-{"type":"moderation_result","payload":{...}}
-{"type":"new_pending","payload":{...}}
-{"type":"queue_update","payload":{...}}
-{"type":"banned","payload":{...}}
-```
-
-### 11.4 Registries
-
-```python
-user_connections: dict[int, set[WebSocket]]
-admin_connections: set[WebSocket]
-registry_lock: asyncio.Lock
-```
-
-### 11.5 PHP push bridge
-
-```
-apexRealtimePush() → POST :8081/api/push
-Header: X-Api-Key: apex-ws-key-2025
-Body: { "event", "payload", "user_id", "to_admins" }
-```
-
-### 11.6 Frontend mismatch
-
-| File | Problem |
-|------|---------|
-| `assets/js/realtime.js` | Uses **SignalR** API (`signalR.HubConnectionBuilder`, `.invoke('Join')`) |
-| `includes/navbar.php` | Loads SignalR CDN; sets `APEX_HUB_URL = BACKEND_URL + '/hub'` → wrong port and path |
-
-**Result:** WebSocket server runs but browser cannot connect with current JS.
-
-### 11.7 Two Python processes
-
-| Process | Models in RAM |
-|---------|---------------|
-| `api.py` | Own copy |
-| `ws_server.py` | Separate copy via `import analyze` |
-
-Auto-retrain in API **does not** reload WS process memory.
+- Path: `uploads/` (avatars, post images/PDF).
+- Allowed extensions: `jpg,jpeg,png,gif,webp,pdf` (max 20 MB).
+- **Gap:** Extension-based validation; limited MIME/magic-byte checks.
 
 ---
 
-## 12. Frontend JavaScript
+## 6. Database Audit
 
-### 12.1 `assets/js/app.js` — composer ML
+### 6.1 Tables
 
-| Setting | Value |
-|---------|-------|
-| Debounce | 500ms (`RT_DEBOUNCE_MS`) |
-| Primary path | `ApexRealtime.previewModeration(text)` if connected |
-| Fallback | `POST ajax.php` `moderate_content` |
+| Table | Purpose |
+|-------|---------|
+| `users` | Accounts, ban state, admin flag |
+| `posts` | Content, ML fields, status enum |
+| `comments` | Thread comments + ML metadata |
+| `likes` | Unique (post_id, user_id) |
+| `friendships` | Directed requests |
+| `notifications` | Activity feed |
+| `content_analysis` | ML audit log |
+| `reports` | User-submitted reports |
 
-| UI status | Submit allowed? |
-|-----------|-----------------|
-| `ALLOWED` | Yes |
-| `REVIEW` | Yes (pending post) |
-| `FORBIDDEN` | No |
-| `OFFLINE` | No |
+### 6.2 Post/Comment Status Model
 
-### 12.2 `assets/js/realtime.js` — events
+`status ENUM('pending','approved','rejected')` — workflow is **DB moderation state**, separate from ML verdict at compose time.
 
-Listens for: `Notification`, `NewPending`, `QueueUpdate`, `ModerationResult`, `Banned`, `LiveModeration`
+### 6.3 Indexes (Present)
 
-**Must be rewritten** for native WebSocket protocol in §11.
+- `posts`: `idx_status`, `idx_user_id`
+- `comments`: `idx_post_status`
+- `likes`: `uq_like`
+- `friendships`: `uq_friendship`
+- `notifications`: `idx_user_unread`
 
----
+### 6.4 Recommended Indexes
 
-## 13. Legacy C# backend
+```sql
+-- Suggested composites for scale
+posts(status, created_at DESC)
+posts(user_id, status, created_at DESC)
+comments(status, created_at DESC)
+content_analysis(label, created_at DESC)
+reports(status, created_at DESC)
+```
 
-**Path:** `Backend/Program.cs`, `Backend/ApexSocial.csproj`
+### 6.5 Integrity Risks
 
-| Item | Status |
-|------|--------|
-| SignalR hub `/hub` | Replaced by `ws_server.py` |
-| REST `/api/*` | Duplicate of PHP — unused |
-| API key | `apex-singular-key-2025` (different from WS push key) |
-| Health `/health` | Admin sidebar still curls `BACKEND_URL/health` — **broken** on 8081 |
-
-**Recommendation:** Remove or archive `Backend/` to avoid confusion.
-
----
-
-## 14. Security audit
-
-| Area | Implementation | Risk |
-|------|----------------|------|
-| ML API exposure | `0.0.0.0:5000` no API key on `/analyze` | High on shared networks |
-| Push API | Key `apex-ws-key-2025` | Medium — hardcoded |
-| PHP XSS input | `apexValidateUserText()` | Good |
-| PHP XSS output | `htmlspecialchars` in templates | Good |
-| Passwords | Plain text in DB (by design) | Critical |
-| CORS ML | Explicit origins | Good |
-| Rate limiting | `security.py` | Good |
-| Fail-closed offline | PHP blocks post if ML down | Good for safety |
+- Plaintext `users.password` (documented in SQL comments).
+- Polymorphic `reports.content_type` / `content_analysis.content_type` without FK to posts/comments.
+- Friendship OR-queries (`sender/receiver`) are hard to index optimally.
 
 ---
 
-## 15. Data files & artifacts
+## 7. API & Communication Audit
 
-| Path | Purpose |
-|------|---------|
-| `ml_api/models/pipeline.pkl` | Hate/harmful classifier |
-| `ml_api/models/scam_pipeline.pkl` | Scam classifier |
+### 7.1 ML REST API (`ml_api/api.py`)
+
+| Method | Route | Purpose |
+|--------|-------|---------|
+| POST | `/analyze` | Single text moderation |
+| POST | `/analyze_batch` | Batch moderation |
+| POST | `/feedback` | Admin label for online learning |
+| POST | `/integrity/check` | Text integrity only |
+| GET | `/health` | Service + model status |
+| GET | `/stats` | Usage / model stats |
+| POST | `/retrain` | Manual retrain trigger |
+| POST | `/reload_models` | Hot-reload `.pkl` |
+| POST | `/test` | Internal test |
+
+Security wrapper: `validate_request()` from `security.py` (rate limit, body size, flood).
+
+### 7.2 WebSocket Protocol (`ws_server.py`)
+
+| Direction | Type | Purpose |
+|-----------|------|---------|
+| In | `join` | Authenticate with token |
+| In | `ping` | Heartbeat |
+| In | `preview_moderation` | Live ML preview |
+| Out | `notification`, `moderation_result`, `queue_update`, `new_pending`, `banned` | Push events |
+
+PHP push: `POST http://{host}:8081/api/push` with header `X-Api-Key: apex-ws-key-2025` (default; should be env-only).
+
+### 7.3 CORS
+
+Origins from `config.json` / `APEX_CORS_ORIGINS` env — localhost-focused.
+
+---
+
+## 8. Machine Learning / AI Audit
+
+### 8.1 Model Artifacts
+
+| File | Model |
+|------|-------|
+| `ml_api/models/pipeline.pkl` | Hate speech |
+| `ml_api/models/scam_pipeline.pkl` | Scam / phishing |
 | `ml_api/models/config.json` | Thresholds, keywords, security |
-| `ml_api/models/labeled_data.csv` | Full train hate data |
-| `ml_api/models/datasets/*.csv` | Scam/phishing train data |
-| `ml_api/models/user_inputs.jsonl` | Online learning log |
-| `ml_api/models/dataset.csv` | Incremental hate sample |
-| `ml_api/models/analysis_log.json` | Last 5000 API analyses (JSON) |
-| `ml_api/models/online_state.json` | Retrain cursor |
-| `ml_api/models/rejected_inputs.jsonl` | Security rejections |
-| `ml_api/models/logs/apex_ml.log` | Central Python log |
+| `ml_api/models/user_inputs.jsonl` | Incremental training log |
+| `ml_api/models/analysis_log.jsonl` | Inference log (trimmed at 5000) |
+| `ml_api/models/online_state.json` | Retrain state |
+
+### 8.2 Training (`train_model.py` v6)
+
+- **Vectorizer:** `TfidfVectorizer(analyzer="char_wb", ngram_range=(3, 5), lowercase=False, max_features=30000, sublinear_tf=True)`
+- **Classifier:** `LogisticRegression(class_weight="balanced")` inside `CalibratedClassifierCV(method="sigmoid")`
+- **Function:** `train_and_save()` (not legacy `train_sklearn` name)
+- **Datasets:** `ml_api/models/datasets/*` + `user_inputs.jsonl`
+- **Balance:** `balance_dataset()` max 3:1 ratio
+- **Keyword repair:** mislabeled safe rows fixed via `keyword_match()` during training
+
+### 8.3 Inference Pipeline (`analyze()`)
+
+```mermaid
+flowchart TD
+    A[Raw text] --> B[prepare_text / integrity]
+    B -->|fail| R[REJECTED]
+    B --> C[keyword_match hate + scam]
+    B --> D[ml_features → dual pipelines]
+    D --> E[apply_context_to_probs]
+    E --> F{semantic_enabled?}
+    F -->|yes| G[semantic_harm_score]
+    F --> H[url_scam_boost on RAW text]
+    G --> H
+    C --> I[Combine scores]
+    H --> I
+    I -->|combined < 52%| AL[ALLOWED]
+    I -->|combined >= 52%| FB[FORBIDDEN]
+```
+
+**Threshold:** `threshold_low` / `threshold` = **0.52** (52%). High band = 0.78.
+
+**URL handling:** `ml_features()` replaces URLs with token `url` for TF-IDF; **`url_scam_boost()` and `find_urls()` run on original raw text**.
+
+**Keywords:** `keyword_match()` with word boundaries, negation lookback, safe hate context — **not** legacy `kw_hit_boundary()`.
+
+### 8.4 Online Learning & Scheduler
+
+| Component | Behavior |
+|-----------|----------|
+| `online_learning.py` | Log samples; auto-retrain when N samples |
+| `scheduler.py` | Incremental ~03:00 UTC; full weekly; calls `/reload_models` |
+| Admin feedback | `POST /feedback` from queue |
+
+**Risks:** Adversarial feedback poisoning; pickle trust; PII in JSONL logs.
+
+### 8.5 ML Security Controls (Present)
+
+- Rate limiting per IP (`security.py`)
+- Max body / text length
+- Integrity rejection path
+- Thread lock on model reload
 
 ---
 
-## 16. End-to-end flows
+## 9. Realtime Subsystem
 
-### 16.1 Live typing (composer)
+**Authoritative implementation:** `ml_api/ws_server.py` (docstring: *replaces C# SignalR*).
+
+| Concern | Implementation |
+|---------|----------------|
+| Client URL | Injected via PHP (`window.APEX_WS_URL`) |
+| Auth | HMAC `WS_SECRET` + session token |
+| Admin channel | Separate `admin_connections` set |
+| PHP integration | `apexRealtimePush()` fire-and-forget cURL |
+
+**Legacy:** `Backend/Program.cs` SignalR hub — only use if Python WS is stopped and port conflict resolved.
+
+---
+
+## 10. Authentication & Security Audit
+
+### 10.1 OWASP-Oriented Summary
+
+| Category | Risk | Notes |
+|----------|------|-------|
+| A01 Broken Access Control | Medium–High | Role checks exist; no CSRF |
+| A02 Cryptographic Failures | **Critical** | Plaintext passwords |
+| A03 Injection | Medium | Prepared SQL; XSS in JS rendering |
+| A04 Insecure Design | High | Dual backend documentation |
+| A05 Misconfiguration | High | Default API keys, CSP relaxed |
+| A07 Auth Failures | **Critical** | Password storage model |
+| A08 Integrity | High | pickle.load on `.pkl` |
+| A09 Logging | Medium | No centralized SIEM |
+
+### 10.2 Session Model
+
+- PHP `session_start()` in `config.php`.
+- Roles: `user`, `admin` in `$_SESSION['role']`.
+- Ban check: `checkSessionValid()` redirects to `banned.php`.
+
+### 10.3 Secrets (Defaults in Source — Rotate)
+
+| Secret | Default location |
+|--------|------------------|
+| `APEX_WS_KEY` | `realtime.php`, `ws_server.py` → `apex-ws-key-2025` |
+| `WS_SECRET` | `ws_server.py` → `apex-ws-secret` |
+| DB creds | `config.php` root/empty |
+
+---
+
+## 11. DevOps & Infrastructure Audit
+
+| Area | Status |
+|------|--------|
+| Deployment | Manual XAMPP + manual Python processes |
+| CI/CD | None |
+| Containers | None |
+| TLS / reverse proxy | Not configured in repo |
+| Monitoring | File logs `ml_api/models/logs/apex_ml.log` |
+| Migrations | Single `database.sql` bootstrap only |
+| Git | Initialized; pushed to GitHub `main`/`master` |
+
+**Production readiness (infra): 4.5 / 10**
+
+---
+
+## 12. Performance Audit
+
+| Area | Bottleneck | Mitigation |
+|------|------------|------------|
+| Feed query | Joins + subqueries | Indexes, pagination, cache |
+| Admin dashboard | Multiple COUNT queries | Materialized stats / single query |
+| Frontend | 1684-line CSS, 755-line JS | Split, minify, cache headers |
+| ML inference | CPU sklearn | Acceptable at small scale; batch endpoint for bulk |
+| Retrain | subprocess in scheduler | Off-peak only; lock during reload |
+
+---
+
+## 13. Code Quality Audit
+
+### 13.1 Strengths
+
+- Clear separation `ml_api/` vs PHP vs `admin/`.
+- ML modules: `text_integrity`, `text_utils`, `context_scoring`, `security`, `semantic_scorer`.
+- Consistent `prepare_text` / `ml_features` between train and inference.
+
+### 13.2 Debt Hotspots
+
+| File | Issue |
+|------|-------|
+| `README.md` | Wrong architecture |
+| `assets/css/style.css` | Size + duplicate rules |
+| `assets/js/app.js` | Multiple concerns in one file |
+| `includes/ajax.php` | No service layer |
+| `Backend/` | Legacy overlap |
+
+### 13.3 Dead / Legacy
+
+- C# backend as parallel stack.
+- `docs/REALTIME_ARCHITECTURE.md` references SignalR events not emitted by Python WS with same names everywhere.
+
+---
+
+## 14. Dependency Audit
+
+### 14.1 Python (`ml_api/requirements.txt`)
 
 ```
-1. User types in #post-content
-2. app.js waits 500ms
-3. Try ApexRealtime.previewModeration (usually fails - SignalR mismatch)
-4. Fallback: ajax.php → moderateContent → :5000/analyze
-5. UI shows Allowed / Forbidden / Pending review
+flask>=2.3.0, flask-cors>=4.0.0
+scikit-learn>=1.3.0, pandas>=2.0.0, numpy>=1.24.0
+openpyxl>=3.1.0, waitress>=3.0.0, apscheduler>=3.10.0
 ```
 
-### 16.2 Submit post
+**Missing (used at runtime):** `websockets`, `aiohttp`
 
-```
-1. index.php POST
-2. apexValidateUserText()
-3. moderateContent() → :5000/analyze  [BROKEN if NameError]
-4. INSERT posts (approved | pending)
-5. logAnalysis() → MySQL
-6. apexNewPending() if REVIEW → :8081 push
+**Optional (commented):** `transformers`, `torch` for semantic transformer path
+
+### 14.2 C# (`Backend/ApexSocial.csproj`)
+
+- .NET 8.0, MySqlConnector 2.3.7
+
+### 14.3 PHP / JS
+
+- No Composer / package.json
+- External: Google Fonts CDN
+
+**Recommendation:** `pip freeze` or Poetry lock; add WS deps; Dependabot/GitHub Actions audit.
+
+---
+
+## 15. System Flow Documentation
+
+### 15.1 New Post (Happy Path)
+
+```mermaid
+sequenceDiagram
+    participant U as User Browser
+    participant J as app.js
+    participant P as PHP
+    participant M as ML :5000
+    participant D as MySQL
+    U->>J: Type post, stop 10s
+    J->>P: moderate_content / WS preview
+    P->>M: POST /analyze
+    M-->>P: ALLOWED
+    U->>P: Submit form
+    P->>M: POST /analyze
+    M-->>P: ALLOWED
+    P->>D: INSERT posts
+    P-->>U: Redirect / success
 ```
 
-### 16.3 Comment
+### 15.2 Blocked Content
 
-```
-ajax.php add_comment → analyzeContent → INSERT (approved | pending)
-```
+ML returns `FORBIDDEN` → PHP does not insert (or marks rejected) → user sees reason in UI.
 
-### 16.4 Admin approve
+### 15.3 Admin Correction
 
-```
-queue.php → UPDATE status → notification → apexModerationResult → user WS (if connected)
+Admin rejects/approves in queue → PHP → `POST /feedback` → sample in `user_inputs.jsonl` → eventual retrain.
+
+---
+
+## 16. File Structure Audit
+
+```text
+apexsocial/
+├── index.php                 # Main feed
+├── database.sql              # Schema + seed
+├── README.md                 # ⚠ needs architecture update
+├── includes/
+│   ├── config.php            # Core bootstrap + ML bridge
+│   ├── ajax.php              # API actions
+│   ├── realtime.php          # Push bridge
+│   └── sanitize.php
+├── pages/                    # User-facing routes
+├── admin/                    # Moderation panel
+├── assets/js/, assets/css/
+├── uploads/                  # User media (runtime)
+├── ml_api/
+│   ├── api.py                # Flask app
+│   ├── train_model.py
+│   ├── ws_server.py
+│   ├── scheduler.py
+│   ├── online_learning.py
+│   ├── text_utils.py, text_integrity.py, security.py
+│   └── models/               # pkl, config, datasets, logs
+├── Backend/                  # Legacy C# SignalR
+├── docs/
+│   ├── FULL_SYSTEM_AUDIT.md          # this file
+│   ├── FULL_SYSTEM_AUDIT_2026-05-28.md
+│   ├── UDHEZUES_TEKNIK_I_PLOTE.md
+│   ├── MODERIMI_APEXSOCIAL.md
+│   └── REALTIME_ARCHITECTURE.md
+└── scripts/                  # Thesis tooling (non-runtime)
 ```
 
 ---
 
-## 17. Known bugs & inconsistencies
+## 17. Documentation Index & Drift Matrix
 
-| ID | Severity | Issue |
-|----|----------|-------|
-| B1 | **P0** | `_record_sample_and_maybe_retrain` undefined in `api.py` |
-| B2 | **P0** | `realtime.js` uses SignalR; server is native WebSocket |
-| B3 | **P0** | `APEX_HUB_URL` = `:8081/hub` — wrong port and path |
-| B4 | P1 | `_append_training_input` uses `clean` not imported |
-| B5 | P1 | Duplicate training log paths (analyze vs batch) |
-| B6 | P1 | WS and API separate processes — model reload desync |
-| B7 | P2 | `websockets` / `aiohttp` missing from `requirements.txt` |
-| B8 | P2 | Admin health check wrong URL |
-| B9 | P2 | Legacy `Backend/` port 8080 conflicts with WS |
-| B10 | P3 | Historical bad labels in `user_inputs.jsonl` (label 0 on harmful text) |
+| Document | Language | Status | Notes |
+|----------|----------|--------|-------|
+| `FULL_SYSTEM_AUDIT.md` | EN | **Current** | This audit (Rev 2) |
+| `UDHEZUES_TEKNIK_I_PLOTE.md` | SQ | Partial | Align with Section 2 |
+| `MODERIMI_APEXSOCIAL.md` | SQ | Partial | Good for thesis Ch.9 |
+| `REALTIME_ARCHITECTURE.md` | EN | **Stale** | Says SignalR/C#; update to Python WS |
+| `README.md` | EN | **Stale** | Claims C# central, PHP→Python forbidden |
+
+**Thesis alignment:** Use hybrid ML description (`char_wb` 3–5, dual models, 52% threshold, URL on raw text). Remove references to `kw_hit_boundary`, `train_sklearn`, C#-only flow, REVIEW verdict.
 
 ---
 
-## 18. Operational checklist
+## 18. Security Risk Matrix
 
-### Start (development)
-
-```powershell
-# 1. XAMPP: Apache + MySQL, import database.sql
-
-# 2. ML API
-cd c:\xampp\htdocs\apexsocial\ml_api
-pip install -r requirements.txt
-pip install websockets aiohttp
-python train_model.py          # first time or after vectorizer change
-python api.py                  # :5000
-
-# 3. WebSocket + Push
-python ws_server.py            # :8080 WS, :8081 push
-
-# 4. Browser
-http://localhost/apexsocial
-```
-
-### Verify
-
-| Check | URL / command |
-|-------|----------------|
-| ML health | `http://127.0.0.1:5000/health` |
-| Analyze test | POST `/analyze` with `{"text":"hello"}` |
-| Push test | POST `:8081/api/push` with API key |
-| PHP preview | Composer type → network tab → ajax or analyze |
+| Risk | Severity | Area | Mitigation |
+|------|----------|------|------------|
+| Plaintext passwords | Critical | DB, login | `password_hash()` migration |
+| Missing CSRF | Critical | ajax.php | Session CSRF tokens |
+| DOM XSS | High | app.js | Safe DOM APIs |
+| Default WS/API keys | High | realtime, ws_server | Env-only secrets |
+| Pickle RCE | High | api.py | Signed artifacts + checksum |
+| Weak upload validation | High | uploads | MIME + magic bytes |
+| CSP unsafe-eval | Medium | config.php | Remove after root-cause fix |
+| Architecture doc drift | Medium | README | Single authoritative doc |
+| DB index gaps | Medium | feed/admin | Composite indexes |
+| Unpinned Python deps | Low–Medium | requirements | Lock file + CI scan |
 
 ---
 
-## 19. Recommendations (prioritized)
+## 19. Improvement Recommendations
 
-### P0 — must fix for stable production
+### 19.1 Critical (0–30 days)
 
-1. Add `_record_sample_and_maybe_retrain()` to `api.py`  
-2. Rewrite `realtime.js` for native WebSocket (`ws://host:8080`)  
-3. Add `APEX_WS_URL` separate from push URL in `navbar.php`  
-4. Fix `clean` → `ml_features` in `_append_training_input`  
+1. Migrate passwords to bcrypt/argon2 (even if thesis mentioned plaintext for demo, document as dev-only).
+2. Implement CSRF on all `ajax.php` POST actions.
+3. Rotate `APEX_WS_KEY`, `WS_SECRET`; remove hardcoded defaults.
+4. Update `README.md` + `REALTIME_ARCHITECTURE.md` to Python WS architecture.
 
-### P1 — architecture
+### 19.2 Security (30–60 days)
 
-5. Unify training logging (remove duplicate path)  
-6. WS calls `http://127.0.0.1:5000/analyze` instead of importing `analyze` in-process  
-7. Add `/health` on push server or fix admin check to use ML `:5000/health`  
+1. Harden uploads; virus scan optional.
+2. Fix XSS paths; restore strict CSP.
+3. Add security headers (HSTS, X-Content-Type-Options, Referrer-Policy).
 
-### P2 — ML quality
+### 19.3 Architecture (60–90 days)
 
-8. `pip install transformers torch` for semantic layer  
-9. Audit/clean `user_inputs.jsonl` before incremental train  
-10. Full retrain after any `build_pipeline` change  
+1. Deprecate or isolate `Backend/` C# project.
+2. Extract PHP service layer from `ajax.php`.
+3. Add GitHub Actions: lint, `pip audit`, basic smoke tests.
 
-### P3 — hardening
+### 19.4 ML Governance
 
-11. Bind ML to `127.0.0.1` only; add API key for `/analyze`  
-12. Remove `Backend/` or document as deprecated  
-13. Add `websockets`, `aiohttp` to `requirements.txt`  
-
----
-
-## Appendix A — File map (ML-related)
-
-```
-ml_api/
-├── api.py                 # Flask inference + routes
-├── train_model.py         # Offline training
-├── ws_server.py           # WebSocket + push
-├── text_utils.py          # Features, keywords, URLs
-├── text_integrity.py      # Unicode integrity
-├── context_scoring.py     # Context / borderline
-├── semantic_scorer.py     # Optional transformers
-├── security.py            # HTTP hardening
-├── online_learning.py     # jsonl + auto-retrain
-├── apex_log.py            # Logging
-├── requirements.txt
-└── models/
-    ├── config.json
-    ├── pipeline.pkl
-    ├── scam_pipeline.pkl
-    ├── labeled_data.csv
-    ├── user_inputs.jsonl
-    ├── dataset.csv
-    ├── analysis_log.json
-    ├── online_state.json
-    ├── logs/apex_ml.log
-    └── datasets/
-        ├── scam.csv
-        ├── malicious_phish.csv
-        └── PhiUSIIL_Phishing_URL_Dataset.csv
-```
+1. Separate admin-verified training set from open feedback.
+2. Model version metadata file next to each `.pkl`.
+3. Evaluation gate before `reload_models` promotes new weights.
 
 ---
 
-## Appendix B — Glossary
+## 20. Final Technical Evaluation
 
-| Term | Meaning |
-|------|---------|
-| `ALLOWED` | Combined score below threshold |
-| `FORBIDDEN` | Blocked content |
-| `REVIEW` | Borderline — human queue (`pending`) |
-| `REJECTED` | Failed integrity validation |
-| `hybrid` | Keywords or bypass flags contributed to score |
-| `char_wb` | Character n-grams with word boundary anchoring |
-| Hot reload | Reload `.pkl` without restarting Python |
+| Dimension | Score /10 | Rationale |
+|-----------|-----------|-----------|
+| Overall code quality | 6.4 | Solid ML; PHP/JS monoliths and doc drift |
+| Security | 3.9 | Critical auth/CSRF issues |
+| Scalability | 5.2 | OK for demo/small deploy |
+| Maintainability | 5.6 | Improving UI; docs still conflict |
+| Performance | 5.8 | Adequate; DB/CSS/JS optimization possible |
+| ML capability | 7.5 | Hybrid pipeline, dual models, online learning |
+| Production readiness | 4.7 | Manual ops, no CI, security gaps |
+
+### Verdict
+
+ApexSocial is a **feature-rich, ML-capable social platform** suitable for **academic demonstration and iterative development**. It is **not production-ready** without addressing authentication, CSRF, XSS, secrets, and documentation accuracy. The **Python ML + PHP + WebSocket** path is the correct basis for all future work.
 
 ---
 
-*End of audit document.*
+## 21. Appendices
+
+### Appendix A — Environment Variables
+
+| Variable | Used by | Purpose |
+|----------|---------|---------|
+| `APEX_WS_KEY` | PHP push, ws_server | Push API authentication |
+| `WS_SECRET` | ws_server | WS token HMAC |
+| `APEX_CORS_ORIGINS` | api.py | ML CORS override |
+| `APEX_SESSION_TOKENS` | ws_server | Admin flags JSON |
+
+### Appendix B — Default Demo Accounts (`database.sql`)
+
+| Role | Username | Password |
+|------|----------|----------|
+| Admin | admin | Admin@2024 |
+| User | alex_smith | Alex@2024 |
+
+Change before any public deployment.
+
+### Appendix C — ML Config Snapshot (`config.json`)
+
+| Key | Value |
+|-----|-------|
+| threshold / threshold_low | 0.52 |
+| threshold_high | 0.78 |
+| semantic_enabled | true |
+| retrain_min_samples | 10 |
+| retrain_every_n | 8 |
+| rate_limit_analyze | 60/min |
+
+### Appendix D — Related Thesis / Project Artifacts
+
+| Artifact | Location |
+|----------|----------|
+| Thesis Word doc | `TemaDiplomes.docx` (repo root) |
+| Thesis patch script | `scripts/patch_thesis_inplace.py` |
+| Ch.9 reference extract | `scripts/thesis_ch9_full.txt` |
+
+### Appendix E — 30/60/90 Day Plan
+
+| Window | Actions |
+|--------|---------|
+| 0–30d | Password hashing, CSRF, secret rotation, README fix |
+| 31–60d | DB indexes, upload hardening, JS modularization |
+| 61–90d | CI/CD, observability, deprecate C# backend |
+
+---
+
+*End of audit — Revision 2, 2026-05-28.*

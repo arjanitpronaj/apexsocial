@@ -37,7 +37,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['content'])) {
             $_SESSION['post_notice'] = ['type'=>'offline','reason'=>'Detection system is currently inactive. Posting is temporarily unavailable. Please try again later.'];
             redirect(BASE_URL.'/index.php');
         }
-        if ($mlVerdict === 'FORBIDDEN') {
+        if (mlVerdictBlocks($mlVerdict)) {
             $_SESSION['post_notice'] = ['type'=>'forbidden','reason'=>$mlReason ?: 'Content flagged as harmful.'];
             redirect(BASE_URL.'/index.php');
         }

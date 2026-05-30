@@ -1,7 +1,4 @@
-"""
-Optional semantic moderation (US platform-style categories).
-Uses HuggingFace transformers when installed; otherwise returns None.
-"""
+"""Optional transformer-based semantic score (disabled when deps missing)."""
 from __future__ import annotations
 
 import json
@@ -13,7 +10,7 @@ from apex_log import setup_logging
 
 log = setup_logging()
 
-# Policy-aligned phrase buckets (Meta/Twitter-style moderation categories)
+# Phrase buckets for threat / harassment / hate patterns
 _THREAT_RE = re.compile(
     r"(?i)\b(?:kill|murder|shoot|stab|bomb|attack|hurt)\s+(?:you|them|him|her|us)\b"
     r"|\b(?:i will|i'll)\s+(?:kill|hurt|destroy|rape)\b"
@@ -46,16 +43,7 @@ def _load_semantic_model_setting() -> str:
 
 @lru_cache(maxsize=1)
 def _get_sentiment_pipeline():
-    """
-    Production note:
-    distilbert-base-uncased-finetuned-sst-2-english is a movie-review sentiment
-    model, not a toxicity classifier. It tends to flag ordinary negative sentences
-    as harmful. For production moderation, replace it with a toxicity model such as:
-      - unitary/toxic-bert
-      - martin-ha/toxic-comment-model
-
-    Set "semantic_model": "toxic-bert" in models/config.json to load unitary/toxic-bert.
-    """
+    # Default is SST-2 sentiment; set semantic_model in config.json for toxic-bert etc.
     global _pipeline, _load_failed, _MODEL_ID
     if _load_failed:
         return None

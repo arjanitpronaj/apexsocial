@@ -1,4 +1,4 @@
-"""Incremental / online learning — log samples and auto-retrain after N new rows."""
+"""Log moderated samples and retrain when enough new rows exist."""
 from __future__ import annotations
 
 import json
@@ -55,13 +55,12 @@ def log_training_sample(
     content_type: str = "post",
     user_id: int = 0,
 ) -> None:
-    """
-    Append every moderated post/comment for incremental learning.
-    label 1 = harmful (FORBIDDEN), label 0 = safe (ALLOWED).
-    """
+    # label 1 = FORBIDDEN, 0 = ALLOWED
     v = (verdict or "").upper()
     if v in ("REJECTED", "OFFLINE", "EMPTY"):
         return
+    if v == "REVIEW":
+        v = "FORBIDDEN"
     label = 1 if v == "FORBIDDEN" else 0
     features = ml_features(raw_text)
     if len(features) < 2:
@@ -155,10 +154,7 @@ def maybe_auto_retrain(
     min_total: int,
     reload_callback,
 ) -> dict:
-    """
-    After each new sample, retrain in background when (total - last_retrain_count) >= every_n.
-    Does not restart the Flask/Waitress process — hot-reloads pickles only.
-    """
+    # Retrain in background when new samples since last run >= every_n.
     global _retrain_running
     total = count_samples()
     state = _load_state()

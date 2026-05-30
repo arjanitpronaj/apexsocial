@@ -1,8 +1,4 @@
-"""
-ApexSocial native WebSocket server (replaces C# SignalR).
-- WS :8080  — client connections, live moderation preview
-- HTTP :8081 — PHP push bridge POST /api/push
-"""
+"""WebSocket server (:8080) and HTTP push bridge (:8081) for realtime events."""
 from __future__ import annotations
 
 import asyncio
@@ -39,19 +35,13 @@ registry_lock = asyncio.Lock()
 _EVENT_TYPE_MAP = {
     "Notification": "notification",
     "ModerationResult": "moderation_result",
-    "NewPending": "new_pending",
     "QueueUpdate": "queue_update",
     "Banned": "banned",
 }
 
 
 def _load_user_admin_flags() -> dict[int, bool]:
-    """
-    Load user_id -> is_admin flags from APEX_SESSION_TOKENS JSON or fallback file.
-    Accepts payload shapes like:
-      {"1": true, "2": false}
-      {"1": {"is_admin": true}, "2": {"is_admin": false}}
-    """
+    """Admin flags from APEX_SESSION_TOKENS env or models/session_tokens.json."""
     data: dict[str, Any] = {}
     env_raw = os.environ.get("APEX_SESSION_TOKENS", "").strip()
     if env_raw:
@@ -144,7 +134,6 @@ async def fan_out_event(
     if msg_type in (
         "notification",
         "moderation_result",
-        "new_pending",
         "queue_update",
         "banned",
     ):

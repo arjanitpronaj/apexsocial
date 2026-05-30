@@ -1,14 +1,11 @@
-"""
-Text integrity and multilingual normalization (Steps 1–2).
-Runs before ML classification and training.
-"""
+"""Unicode normalization and integrity checks before ML inference."""
 from __future__ import annotations
 
 import re
 import unicodedata
 from dataclasses import dataclass, field
 
-# --- Homoglyph / confusable maps (Unicode bypass) ---
+# Homoglyph / confusable character maps
 _HOMOGLYPH_MAP: dict[int, str] = {}
 
 def _add_map(chars: str, target: str) -> None:
@@ -186,9 +183,7 @@ def validate_structure(text: str) -> list[str]:
 
 
 def prepare_text(raw: str, *, strict: bool = True) -> IntegrityResult:
-    """
-    Full integrity pipeline: validate → normalize → flags → ML-ready string.
-    """
+    """Validate, normalize, and build ML-ready text."""
     raw = str(raw or "")
     errors = validate_structure(raw)
     if errors and strict:

@@ -44,7 +44,7 @@ function strip_control_chars_php(string $text): string
     return preg_replace('/[\x00-\x08\x0B\x0C\x0E-\x1F\x7F]/u', '', $text) ?? '';
 }
 
-/** Escape for HTML output only — never before DB insert. */
+/** HTML escape only; store raw UTF-8 in the database. */
 function apex_e(?string $value): string
 {
     return htmlspecialchars((string) $value, ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8');

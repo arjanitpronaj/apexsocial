@@ -291,7 +291,6 @@
   ],
   "threshold_low": 0.52,
   "threshold_high": 0.78,
-  "borderline_review_only": false,
   "bypass_boost": 18,
   "retrain_min_samples": 10,
   "retrain_every_n": 8,

@@ -21,11 +21,7 @@ if (!window.__apexGlobalErrorHandlersInstalled) {
 }
 
 /**
- * Composer moderation — delayed processing (10s inactivity).
- *
- * No per-keystroke ML calls. Each input resets a countdown; after 10s without
- * changes, text is sent once via WebSocket (ws_server.py :8080 → ML API :5000).
- * UI updates from the verdict: Post enabled only when safe.
+ * Post composer: 10s idle countdown, then one ML check (WebSocket or HTTP fallback).
  */
 (function () {
     const ta = document.getElementById('post-content');
@@ -52,7 +48,7 @@ if (!window.__apexGlobalErrorHandlersInstalled) {
     let pendingSubmitAfterCheck = false;
     let programmaticSubmit = false;
 
-    // ── UI helpers ──────────────────────────────────────────
+    // UI helpers
     function setIcon(type) {
         const icon = mlAlert.querySelector('.ml-alert-icon');
         if (!icon) return;
@@ -88,7 +84,6 @@ if (!window.__apexGlobalErrorHandlersInstalled) {
         el.style.display = 'block';
         if (stateClass === 'forbidden') el.style.color = '#dc2626';
         else if (stateClass === 'allowed') el.style.color = '#16a34a';
-        else if (stateClass === 'review') el.style.color = '#d97706';
         else el.style.color = '#64748b';
     }
 
@@ -111,7 +106,7 @@ if (!window.__apexGlobalErrorHandlersInstalled) {
         el.style.display = visible ? 'inline' : 'none';
     }
 
-    // ── Countdown ticker ────────────────────────────────────
+    // Countdown ticker
     function startCountdown() {
         clearCountdown();
         countdownActive = true;
@@ -180,7 +175,7 @@ if (!window.__apexGlobalErrorHandlersInstalled) {
 
     function applyVerdict(d) {
         const v = String(d.verdict || d.status || 'ALLOWED').toUpperCase();
-        if (v === 'FORBIDDEN') {
+        if (v === 'FORBIDDEN' || v === 'REVIEW') {
             const categoryLabel = d.category === 'hate_speech'
                 ? 'Hate speech'
                 : (d.category === 'phishing_scam' ? 'Scam/phishing' : 'Policy');
@@ -269,7 +264,7 @@ if (!window.__apexGlobalErrorHandlersInstalled) {
         setML('idle', 'Start typing to enable Post', 'AI check runs 10s after you stop typing (via WebSocket).');
     }
 
-    // ── Input listener ──────────────────────────────────────
+    // Input listener
     ta.addEventListener('input', () => {
         cc.textContent = ta.value.length + ' / 1000';
         btn.disabled   = true;
@@ -288,7 +283,7 @@ if (!window.__apexGlobalErrorHandlersInstalled) {
         }, INPUT_IDLE_DEBOUNCE_MS);
     });
 
-    // ── Form submit guard ───────────────────────────────────
+    // Form submit guard
     document.getElementById('post-form').addEventListener('submit', e => {
         if (programmaticSubmit) {
             programmaticSubmit = false;
@@ -606,9 +601,7 @@ async function addFriend(uid, btn) {
     });
 })();
 
-// =============================================================================
-// Real-time UI (toasts, badges) — uses ApexRealtime from realtime.js
-// =============================================================================
+// Real-time UI (toasts, badges) via ApexRealtime
 (function () {
     'use strict';
 
@@ -622,7 +615,7 @@ async function addFriend(uid, btn) {
     const TOAST_TTL = 4000;
     const MAX_TOASTS = 4;
 
-    // --- Toast UI (bottom-right, max 4, auto-dismiss) ---
+    // Toast UI
     function injectToastStyles() {
         if (document.getElementById('apex-toast-styles')) {
             return;
@@ -783,14 +776,6 @@ async function addFriend(uid, btn) {
     });
 
     if (isAdmin) {
-        ApexRealtime.on('NewPending', () => {
-            const queueUrl = `${base}/admin/queue.php`;
-            showToast('New content pending review', 'warning', {
-                html: `New content pending review — <a href="${queueUrl}">Review queue</a>`,
-            });
-            bumpQueueBadge(1);
-        });
-
         ApexRealtime.on('QueueUpdate', () => {
             document.querySelectorAll('a[href*="queue.php"] .sb-badge').forEach((el) => {
                 const n = parseInt(el.textContent, 10) || 0;

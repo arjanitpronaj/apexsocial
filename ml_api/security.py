@@ -1,6 +1,4 @@
-"""
-Request security layer (Step 3): rate limiting, sanitization, spam/flood detection.
-"""
+"""Rate limits, request size checks, and flood detection for the ML API."""
 from __future__ import annotations
 
 import json

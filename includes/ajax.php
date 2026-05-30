@@ -47,6 +47,9 @@ if ($action === 'moderate_content') {
     }
 
     $verdict = strtoupper((string) ($result['verdict'] ?? 'ALLOWED'));
+    if ($verdict === 'REVIEW') {
+        $verdict = 'FORBIDDEN';
+    }
     echo json_encode([
         'status'       => $verdict,
         'reason'       => $result['reason']       ?? '',
@@ -114,7 +117,7 @@ if ($action === 'add_comment') {
         ]); exit;
     }
     $verdict = strtoupper((string)($analysis['verdict'] ?? 'ALLOWED'));
-    $commentStatus = ($verdict === 'FORBIDDEN') ? 'rejected' : 'approved';
+    $commentStatus = mlVerdictBlocks($verdict) ? 'rejected' : 'approved';
     $pdo->prepare("INSERT INTO comments (post_id,user_id,content,status,ml_label,ml_prob,ml_category,ml_method)
                    VALUES (?,?,?,?,?,?,?,?)")
         ->execute([

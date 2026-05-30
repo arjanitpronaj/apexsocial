@@ -5,12 +5,17 @@ $PAGE = 'posts';
 require_once 'inc_sidebar.php';
 
 $status = $_GET['status'] ?? 'all';
-$where  = $status === 'all' ? '' : "WHERE p.status = " . $pdo->quote($status);
+if ($status === 'rejected') {
+    $where = "WHERE p.status IN ('rejected', 'pending')";
+} elseif ($status === 'all') {
+    $where = '';
+} else {
+    $where = "WHERE p.status = " . $pdo->quote($status);
+}
 
 $totalPosts     = (int)$pdo->query("SELECT COUNT(*) FROM posts")->fetchColumn();
 $approvedPosts  = (int)$pdo->query("SELECT COUNT(*) FROM posts WHERE status='approved'")->fetchColumn();
-$pendingPosts   = (int)$pdo->query("SELECT COUNT(*) FROM posts WHERE status='pending'")->fetchColumn();
-$rejectedPosts  = (int)$pdo->query("SELECT COUNT(*) FROM posts WHERE status='rejected'")->fetchColumn();
+$rejectedPosts  = (int)$pdo->query("SELECT COUNT(*) FROM posts WHERE status IN ('rejected','pending')")->fetchColumn();
 
 $posts = $pdo->query("
     SELECT p.*, u.username, u.full_name, u.avatar_color, u.is_blocked AS user_blocked
@@ -39,7 +44,7 @@ echo adminSidebar();
     </div>
 </div>
 
-<div class="sg stat-4">
+<div class="sg stat-3">
     <div class="sc">
         <div class="sc-accent sc-violet"></div>
         <div class="sc-icon sc-violet">
@@ -54,15 +59,7 @@ echo adminSidebar();
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="20 6 9 17 4 12"/></svg>
         </div>
         <div class="sc-val"><?= $approvedPosts ?></div>
-        <div class="sc-lbl">Approved</div>
-    </div>
-    <div class="sc">
-        <div class="sc-accent sc-amber"></div>
-        <div class="sc-icon sc-amber">
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
-        </div>
-        <div class="sc-val"><?= $pendingPosts ?></div>
-        <div class="sc-lbl">Pending</div>
+        <div class="sc-lbl">Allowed</div>
     </div>
     <div class="sc">
         <div class="sc-accent sc-red"></div>
@@ -70,15 +67,14 @@ echo adminSidebar();
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
         </div>
         <div class="sc-val"><?= $rejectedPosts ?></div>
-        <div class="sc-lbl">Rejected</div>
+        <div class="sc-lbl">Forbidden</div>
     </div>
 </div>
 
 <div class="row-wrap mb-16" style="gap:6px">
     <a href="?status=all"      class="btn <?= $status === 'all'      ? 'btn-primary' : 'btn-ghost' ?> btn-sm">All</a>
-    <a href="?status=approved" class="btn <?= $status === 'approved' ? 'btn-primary' : 'btn-ghost' ?> btn-sm">Approved</a>
-    <a href="?status=pending"  class="btn <?= $status === 'pending'  ? 'btn-primary' : 'btn-ghost' ?> btn-sm">Pending</a>
-    <a href="?status=rejected" class="btn <?= $status === 'rejected' ? 'btn-primary' : 'btn-ghost' ?> btn-sm">Rejected</a>
+    <a href="?status=approved" class="btn <?= $status === 'approved' ? 'btn-primary' : 'btn-ghost' ?> btn-sm">Allowed</a>
+    <a href="?status=rejected" class="btn <?= $status === 'rejected' ? 'btn-primary' : 'btn-ghost' ?> btn-sm">Forbidden</a>
 </div>
 
 <div class="card card-clean">
