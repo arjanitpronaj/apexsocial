@@ -1,5 +1,12 @@
 <?php
-/** WebSocket push from PHP to ws_server (port 8081). */
+/** Socket.IO push bridge: POST /api/push on port 8081. */
+
+function apexWsJoinToken(int $userId): string
+{
+    $secret = getenv('WS_SECRET') ?: 'apex-ws-secret';
+    $bucket = (string) floor(time() / 300);
+    return hash_hmac('sha256', ((string) $userId) . ':' . $bucket, $secret);
+}
 
 if (!defined('REALTIME_PUSH_KEY')) {
     define('REALTIME_PUSH_KEY', getenv('APEX_WS_KEY') ?: 'apex-ws-key-2025');

@@ -1,4 +1,4 @@
-"""WebSocket server (:8080) and HTTP push bridge (:8081) for realtime events."""
+"""Socket.IO server (:8080) and HTTP push bridge (:8081) for realtime events."""
 from __future__ import annotations
 
 import asyncio
@@ -10,9 +10,8 @@ import time
 from pathlib import Path
 from typing import Any
 
-import websockets
+import socketio
 from aiohttp import web
-from websockets.server import WebSocketServerProtocol
 
 from apex_log import setup_logging
 
@@ -26,12 +25,22 @@ PUSH_HOST = "0.0.0.0"
 PUSH_PORT = 8081
 SESSION_TOKENS_FILE = Path(__file__).parent / "models" / "session_tokens.json"
 
-# user_id → open sockets for that user
-user_connections: dict[int, set[WebSocketServerProtocol]] = {}
-admin_connections: set[WebSocketServerProtocol] = set()
+sio = socketio.AsyncServer(
+    async_mode="aiohttp",
+    cors_allowed_origins="*",
+    ping_interval=20,
+    ping_timeout=20,
+    max_http_buffer_size=2**20,
+)
+socket_app = web.Application()
+sio.attach(socket_app)
+
+user_sids: dict[int, set[str]] = {}
+admin_sids: set[str] = set()
+sid_meta: dict[str, dict[str, Any]] = {}
+preview_last_at: dict[str, float] = {}
 registry_lock = asyncio.Lock()
 
-# PHP / legacy event name → outbound WS message type
 _EVENT_TYPE_MAP = {
     "Notification": "notification",
     "ModerationResult": "moderation_result",
@@ -41,7 +50,6 @@ _EVENT_TYPE_MAP = {
 
 
 def _load_user_admin_flags() -> dict[int, bool]:
-    """Admin flags from APEX_SESSION_TOKENS env or models/session_tokens.json."""
     data: dict[str, Any] = {}
     env_raw = os.environ.get("APEX_SESSION_TOKENS", "").strip()
     if env_raw:
@@ -75,7 +83,6 @@ def _load_user_admin_flags() -> dict[int, bool]:
 def _valid_join_token(user_id: int, token: str) -> bool:
     if not token:
         return False
-    # Accept current and previous 5-minute window for clock skew.
     now_window = int(time.time() // 300)
     for window in (now_window, now_window - 1):
         payload = f"{user_id}:{window}".encode("utf-8")
@@ -85,41 +92,37 @@ def _valid_join_token(user_id: int, token: str) -> bool:
     return False
 
 
-def _peer_ip(ws: WebSocketServerProtocol) -> str:
-    addr = ws.remote_address
-    if addr is None:
-        return "unknown"
-    return str(addr[0]) if isinstance(addr, tuple) else str(addr)
+async def _emit_message(sid: str, payload: dict) -> None:
+    await sio.emit("apex", payload, to=sid)
 
 
-async def _send_json(ws: WebSocketServerProtocol, payload: dict) -> None:
-    await ws.send(json.dumps(payload, ensure_ascii=False))
-
-
-async def _register(ws: WebSocketServerProtocol, user_id: int, is_admin: bool) -> None:
+async def _register(sid: str, user_id: int, is_admin: bool) -> None:
     async with registry_lock:
-        user_connections.setdefault(user_id, set()).add(ws)
+        user_sids.setdefault(user_id, set()).add(sid)
         if is_admin:
-            admin_connections.add(ws)
+            admin_sids.add(sid)
+        sid_meta[sid] = {"user_id": user_id, "is_admin": is_admin, "joined": True}
 
 
-async def _unregister(ws: WebSocketServerProtocol) -> None:
+async def _unregister(sid: str) -> None:
     async with registry_lock:
-        for uid in list(user_connections.keys()):
-            conns = user_connections[uid]
-            conns.discard(ws)
+        for uid in list(user_sids.keys()):
+            conns = user_sids[uid]
+            conns.discard(sid)
             if not conns:
-                del user_connections[uid]
-        admin_connections.discard(ws)
+                del user_sids[uid]
+        admin_sids.discard(sid)
+        sid_meta.pop(sid, None)
+        preview_last_at.pop(sid, None)
 
 
-async def _collect_targets(user_id: int | None, to_admins: bool) -> list[WebSocketServerProtocol]:
+async def _collect_target_sids(user_id: int | None, to_admins: bool) -> list[str]:
     async with registry_lock:
-        targets: set[WebSocketServerProtocol] = set()
+        targets: set[str] = set()
         if user_id is not None and user_id > 0:
-            targets |= user_connections.get(user_id, set())
+            targets |= user_sids.get(user_id, set())
         if to_admins:
-            targets |= admin_connections
+            targets |= admin_sids
         return list(targets)
 
 
@@ -129,85 +132,61 @@ async def fan_out_event(
     to_admins: bool,
     payload: dict,
 ) -> int:
-    """Push JSON event to matching sockets. Returns delivery count."""
     msg_type = _EVENT_TYPE_MAP.get(event, event.lower())
-    if msg_type in (
-        "notification",
-        "moderation_result",
-        "queue_update",
-        "banned",
-    ):
-        message = {"type": msg_type, "payload": payload}
-    else:
-        message = {"type": msg_type, "payload": payload}
-
-    targets = await _collect_targets(user_id, to_admins)
+    message = {"type": msg_type, "payload": payload}
+    targets = await _collect_target_sids(user_id, to_admins)
     sent = 0
-    dead: list[WebSocketServerProtocol] = []
+    dead: list[str] = []
 
-    for ws in targets:
+    for sid in targets:
         try:
-            await _send_json(ws, message)
+            await _emit_message(sid, message)
             sent += 1
         except Exception as ex:
-            log.warning("Fan-out failed to %s: %s", _peer_ip(ws), ex)
-            dead.append(ws)
+            log.warning("Fan-out failed sid=%s: %s", sid, ex)
+            dead.append(sid)
 
-    for ws in dead:
-        await _unregister(ws)
+    for sid in dead:
+        await _unregister(sid)
 
     return sent
 
 
-async def _handle_join(
-    ws: WebSocketServerProtocol,
-    data: dict,
-    *,
-    joined: bool,
-) -> tuple[bool, bool]:
-    """Returns (keep_open, join_succeeded)."""
+async def _handle_join(sid: str, data: dict, *, joined: bool) -> tuple[bool, bool]:
     try:
         user_id = int(data.get("user_id", 0))
     except (TypeError, ValueError):
-        log.warning("Invalid join user_id from %s", _peer_ip(ws))
-        await _send_json(ws, {"type": "error", "msg": "invalid_user"})
-        await ws.close()
+        log.warning("Invalid join user_id sid=%s", sid)
+        await _emit_message(sid, {"type": "error", "msg": "invalid_user"})
         return False, False
 
     if user_id <= 0:
-        log.warning("Join rejected invalid user_id=%s from %s", user_id, _peer_ip(ws))
-        await _send_json(ws, {"type": "error", "msg": "invalid_user"})
-        await ws.close()
+        log.warning("Join rejected invalid user_id=%s sid=%s", user_id, sid)
+        await _emit_message(sid, {"type": "error", "msg": "invalid_user"})
         return False, False
 
     token = str(data.get("token", "")).strip()
     if not _valid_join_token(user_id, token):
-        log.warning("Join auth failed user_id=%s from %s", user_id, _peer_ip(ws))
-        await _send_json(ws, {"type": "error", "msg": "auth_failed"})
-        await ws.close()
+        log.warning("Join auth failed user_id=%s sid=%s", user_id, sid)
+        await _emit_message(sid, {"type": "error", "msg": "auth_failed"})
         return False, False
 
     admin_flags = _load_user_admin_flags()
     is_admin = bool(admin_flags.get(user_id, False))
 
     if joined:
-        await _unregister(ws)
+        await _unregister(sid)
 
-    await _register(ws, user_id, is_admin)
-    await _send_json(ws, {"type": "joined", "user_id": user_id, "is_admin": is_admin})
-    log.info(
-        "Client joined ip=%s user_id=%s is_admin=%s",
-        _peer_ip(ws),
-        user_id,
-        is_admin,
-    )
+    await _register(sid, user_id, is_admin)
+    await _emit_message(sid, {"type": "joined", "user_id": user_id, "is_admin": is_admin})
+    log.info("Client joined sid=%s user_id=%s is_admin=%s", sid, user_id, is_admin)
     return True, True
 
 
-async def _handle_preview_moderation(ws: WebSocketServerProtocol, data: dict) -> None:
+async def _handle_preview_moderation(sid: str, data: dict) -> None:
     text = str(data.get("text", "")).strip()
     if len(text) < 2:
-        await _send_json(ws, {
+        await _emit_message(sid, {
             "type": "live_moderation",
             "verdict": "ALLOWED",
             "harmful_prob": 0.0,
@@ -219,7 +198,7 @@ async def _handle_preview_moderation(ws: WebSocketServerProtocol, data: dict) ->
         return
 
     if len(text) > 8000:
-        await _send_json(ws, {"type": "error", "msg": "text_too_long"})
+        await _emit_message(sid, {"type": "error", "msg": "text_too_long"})
         return
 
     from api import analyze
@@ -229,11 +208,11 @@ async def _handle_preview_moderation(ws: WebSocketServerProtocol, data: dict) ->
         result = await loop.run_in_executor(None, analyze, text)
     except Exception as ex:
         log.error("preview_moderation analyze failed: %s", ex)
-        await _send_json(ws, {"type": "error", "msg": "server_error"})
+        await _emit_message(sid, {"type": "error", "msg": "server_error"})
         return
 
     verdict = str(result.get("verdict", "ALLOWED"))
-    await _send_json(ws, {
+    await _emit_message(sid, {
         "type": "live_moderation",
         "verdict": verdict,
         "harmful_prob": float(result.get("harmful_prob", 0) or 0),
@@ -244,83 +223,66 @@ async def _handle_preview_moderation(ws: WebSocketServerProtocol, data: dict) ->
     })
 
 
-async def _dispatch_message(ws: WebSocketServerProtocol, raw: str, *, joined: bool) -> tuple[bool, bool]:
-    """Returns (keep_open, join_succeeded)."""
-    try:
-        data = json.loads(raw)
-    except json.JSONDecodeError:
-        log.warning("Invalid JSON from %s", _peer_ip(ws))
-        await _send_json(ws, {"type": "error", "msg": "invalid_json"})
-        return True, False
-
-    if not isinstance(data, dict):
-        log.warning("Non-object JSON from %s", _peer_ip(ws))
-        await _send_json(ws, {"type": "error", "msg": "invalid_message"})
-        return True, False
-
+async def _dispatch_client_message(sid: str, data: dict, *, joined: bool) -> tuple[bool, bool]:
     msg_type = str(data.get("type", "")).lower()
 
     try:
         if msg_type == "join":
-            return await _handle_join(ws, data, joined=joined)
+            return await _handle_join(sid, data, joined=joined)
         if not joined:
-            log.warning("Message before join from %s: %s", _peer_ip(ws), msg_type)
-            await _send_json(ws, {"type": "error", "msg": "join_required"})
+            log.warning("Message before join sid=%s: %s", sid, msg_type)
+            await _emit_message(sid, {"type": "error", "msg": "join_required"})
             return True, False
         if msg_type == "ping":
-            await _send_json(ws, {"type": "pong"})
+            await _emit_message(sid, {"type": "pong"})
             return True, False
         if msg_type == "preview_moderation":
-            await _handle_preview_moderation(ws, data)
+            await _handle_preview_moderation(sid, data)
             return True, False
 
-        log.warning("Unknown message type '%s' from %s", msg_type, _peer_ip(ws))
-        await _send_json(ws, {"type": "error", "msg": "unknown_type"})
+        log.warning("Unknown message type '%s' sid=%s", msg_type, sid)
+        await _emit_message(sid, {"type": "error", "msg": "unknown_type"})
         return True, False
     except Exception as ex:
-        log.error("Handler error (%s) from %s: %s", msg_type, _peer_ip(ws), ex)
+        log.error("Handler error (%s) sid=%s: %s", msg_type, sid, ex)
         try:
-            await _send_json(ws, {"type": "error", "msg": "server_error"})
+            await _emit_message(sid, {"type": "error", "msg": "server_error"})
         except Exception:
             pass
         return True, False
 
 
-async def ws_client_handler(ws: WebSocketServerProtocol) -> None:
-    ip = _peer_ip(ws)
-    log.info("WebSocket connect ip=%s", ip)
-    joined = False
-    last_preview_at = 0.0
-    try:
-        async for message in ws:
-            if isinstance(message, bytes):
-                message = message.decode("utf-8", errors="replace")
-            if not isinstance(message, str):
-                continue
-            # Per-connection preview_moderation rate-limit.
-            try:
-                obj = json.loads(message)
-                if isinstance(obj, dict) and str(obj.get("type", "")).lower() == "preview_moderation":
-                    now = time.monotonic()
-                    if now - last_preview_at < 1.2:
-                        await _send_json(ws, {"type": "error", "msg": "rate_limited"})
-                        continue
-                    last_preview_at = now
-            except Exception:
-                pass
+@sio.event
+async def connect(sid, environ):
+    sid_meta[sid] = {"joined": False, "user_id": 0, "is_admin": False}
+    log.info("Socket.IO connect sid=%s", sid)
 
-            keep_open, join_succeeded = await _dispatch_message(ws, message, joined=joined)
-            if not keep_open:
-                break
-            if join_succeeded and not joined:
-                joined = True
-    except websockets.ConnectionClosed:
-        pass
-    except Exception as ex:
-        log.error("WebSocket session error ip=%s: %s", ip, ex)
-    finally:
-        await _unregister(ws)
-        log.info("WebSocket disconnect ip=%s", ip)
+
+@sio.event
+async def disconnect(sid):
+    await _unregister(sid)
+    log.info("Socket.IO disconnect sid=%s", sid)
+
+
+@sio.on("apex")
+async def on_apex(sid, data):
+    if not isinstance(data, dict):
+        await _emit_message(sid, {"type": "error", "msg": "invalid_message"})
+        return
+
+    joined = bool(sid_meta.get(sid, {}).get("joined"))
+
+    if str(data.get("type", "")).lower() == "preview_moderation":
+        now = time.monotonic()
+        last = preview_last_at.get(sid, 0.0)
+        if now - last < 1.2:
+            await _emit_message(sid, {"type": "error", "msg": "rate_limited"})
+            return
+        preview_last_at[sid] = now
+
+    keep_open, join_succeeded = await _dispatch_client_message(sid, data, joined=joined)
+    if not keep_open:
+        await sio.disconnect(sid)
 
 
 async def _handle_push(request: web.Request) -> web.Response:
@@ -365,32 +327,33 @@ async def _handle_push(request: web.Request) -> web.Response:
     return web.json_response({"sent": True, "delivered": count})
 
 
+async def _health(_request: web.Request) -> web.Response:
+    return web.json_response({"ok": True, "service": "apex-push"})
+
+
 async def _run_push_server() -> None:
-    app = web.Application()
-    app.router.add_post("/api/push", _handle_push)
-    runner = web.AppRunner(app)
+    push_app = web.Application()
+    push_app.router.add_post("/api/push", _handle_push)
+    push_app.router.add_get("/health", _health)
+    runner = web.AppRunner(push_app)
     await runner.setup()
     site = web.TCPSite(runner, PUSH_HOST, PUSH_PORT)
     await site.start()
     log.info("HTTP push server listening on http://%s:%s", PUSH_HOST, PUSH_PORT)
 
 
-async def _run_ws_server() -> None:
-    async with websockets.serve(
-        ws_client_handler,
-        WS_HOST,
-        WS_PORT,
-        ping_interval=20,
-        ping_timeout=20,
-        max_size=2**20,
-    ):
-        log.info("WebSocket server listening on ws://%s:%s", WS_HOST, WS_PORT)
-        await asyncio.Future()
+async def _run_socketio_server() -> None:
+    runner = web.AppRunner(socket_app)
+    await runner.setup()
+    site = web.TCPSite(runner, WS_HOST, WS_PORT)
+    await site.start()
+    log.info("Socket.IO server listening on http://%s:%s", WS_HOST, WS_PORT)
 
 
 async def main() -> None:
-    log.info("Starting ApexSocial WS + push servers")
-    await asyncio.gather(_run_ws_server(), _run_push_server())
+    log.info("Starting ApexSocial Socket.IO + push servers")
+    await asyncio.gather(_run_socketio_server(), _run_push_server())
+    await asyncio.Future()
 
 
 if __name__ == "__main__":

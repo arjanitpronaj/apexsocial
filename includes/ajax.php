@@ -47,9 +47,6 @@ if ($action === 'moderate_content') {
     }
 
     $verdict = strtoupper((string) ($result['verdict'] ?? 'ALLOWED'));
-    if ($verdict === 'REVIEW') {
-        $verdict = 'FORBIDDEN';
-    }
     echo json_encode([
         'status'       => $verdict,
         'reason'       => $result['reason']       ?? '',

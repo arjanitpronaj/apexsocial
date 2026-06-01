@@ -91,7 +91,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     redirect('queue.php');
 }
 
-// Blocked content only (rejected + legacy pending rows from old REVIEW flow).
+// Blocked content only (rejected + legacy pending rows).
 $posts = $pdo->query("
     SELECT p.*, u.username, u.full_name, u.avatar_color
     FROM posts p JOIN users u ON p.user_id = u.id

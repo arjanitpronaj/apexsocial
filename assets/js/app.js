@@ -175,7 +175,7 @@ if (!window.__apexGlobalErrorHandlersInstalled) {
 
     function applyVerdict(d) {
         const v = String(d.verdict || d.status || 'ALLOWED').toUpperCase();
-        if (v === 'FORBIDDEN' || v === 'REVIEW') {
+        if (v === 'FORBIDDEN') {
             const categoryLabel = d.category === 'hate_speech'
                 ? 'Hate speech'
                 : (d.category === 'phishing_scam' ? 'Scam/phishing' : 'Policy');

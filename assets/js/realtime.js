@@ -1,4 +1,4 @@
-// WebSocket client for ws_server.py (:8080)
+// Socket.IO client for ws_server.py (:8080)
 (function (global) {
     'use strict';
 
@@ -16,16 +16,22 @@
         return;
     }
 
-    function resolveWsUrl() {
+    if (typeof global.io !== 'function') {
+        apexLogError('Socket.IO client not loaded', null);
+        global.ApexRealtime = { connected: false, isConnected: () => false };
+        return;
+    }
+
+    function resolveSocketUrl() {
         if (global.APEX_WS_URL) {
             return global.APEX_WS_URL;
         }
         const host = global.location.hostname || '127.0.0.1';
-        const proto = global.location.protocol === 'https:' ? 'wss:' : 'ws:';
+        const proto = global.location.protocol === 'https:' ? 'https:' : 'http:';
         return `${proto}//${host}:8080`;
     }
 
-    const wsUrl = resolveWsUrl();
+    const socketUrl = resolveSocketUrl();
     const listeners = new Map();
     let socket = null;
     let heartbeatTimer = null;
@@ -36,7 +42,6 @@
     let lastPongAt = 0;
     let pongCheckTimer = null;
 
-    let previewPendingText = '';
     let previewSeq = 0;
     let previewWaiters = [];
 
@@ -123,7 +128,7 @@
         const prob = payload.harmful_prob != null
             ? ` (${Number(payload.harmful_prob).toFixed(1)}%)`
             : '';
-        if (v === 'FORBIDDEN' || v === 'REVIEW') {
+        if (v === 'FORBIDDEN') {
             const cat = payload.category === 'hate_speech'
                 ? 'Hate speech'
                 : (payload.category === 'phishing_scam' ? 'Scam/phishing' : 'Policy');
@@ -137,6 +142,17 @@
         setPreviewStatus('Allowed — content passed the check', 'allowed');
     }
 
+    function emitApex(obj) {
+        if (!socket || !socket.connected) return false;
+        try {
+            socket.emit('apex', obj);
+            return true;
+        } catch (e) {
+            apexLogError('Socket.IO emit failed', e, obj);
+            return false;
+        }
+    }
+
     function sendPreviewModeration(text) {
         const trimmed = (text || '').trim();
         if (trimmed.length < 2) {
@@ -145,11 +161,10 @@
             return;
         }
 
-        previewPendingText = trimmed;
         previewSeq += 1;
         const seq = previewSeq;
 
-        if (!socket || socket.readyState !== WebSocket.OPEN || !joined) {
+        if (!socket || !socket.connected || !joined) {
             setPreviewStatus('Real-time preview unavailable', 'offline');
             resolvePreviewWaiters(null);
             return;
@@ -169,7 +184,7 @@
         };
 
         const off = on('LiveModeration', finish);
-        if (!sendJson({ type: 'preview_moderation', text: trimmed })) {
+        if (!emitApex({ type: 'preview_moderation', text: trimmed })) {
             off();
             setPreviewStatus('Real-time preview unavailable', 'offline');
             finish(null);
@@ -199,19 +214,8 @@
         }
     }
 
-    function sendJson(obj) {
-        if (!socket || socket.readyState !== WebSocket.OPEN) return false;
-        try {
-            socket.send(JSON.stringify(obj));
-            return true;
-        } catch (e) {
-            apexLogError('WebSocket send failed', e, obj);
-            return false;
-        }
-    }
-
     function sendJoin() {
-        sendJson({
+        emitApex({
             type: 'join',
             user_id: user.userId,
             token: user.wsToken || '',
@@ -221,19 +225,19 @@
     function startHeartbeat() {
         stopHeartbeat();
         heartbeatTimer = setInterval(() => {
-            if (!socket || socket.readyState !== WebSocket.OPEN) return;
-            sendJson({ type: 'ping' });
+            if (!socket || !socket.connected) return;
+            emitApex({ type: 'ping' });
             if (pongCheckTimer) {
                 clearTimeout(pongCheckTimer);
             }
             pongCheckTimer = setTimeout(() => {
-                if (!socket || socket.readyState !== WebSocket.OPEN) return;
+                if (!socket || !socket.connected) return;
                 if (Date.now() - lastPongAt > 31000) {
                     apexLogWarn('Pong timeout, reconnecting socket');
                     try {
-                        socket.close();
+                        socket.disconnect();
                     } catch (e) {
-                        apexLogError('Socket close after pong timeout failed', e);
+                        apexLogError('Socket disconnect after pong timeout failed', e);
                     }
                     scheduleReconnect();
                 }
@@ -242,6 +246,7 @@
     }
 
     function handleMessage(msg) {
+        if (!msg || typeof msg !== 'object') return;
         const type = (msg.type || '').toLowerCase();
 
         switch (type) {
@@ -269,23 +274,35 @@
                 emit('LiveModeration', msg);
                 break;
             default:
-                apexLogWarn('Unknown WebSocket message type', type);
+                apexLogWarn('Unknown realtime message type', type);
                 break;
         }
     }
 
     function connect() {
         return new Promise((resolve) => {
-            if (socket && (socket.readyState === WebSocket.OPEN || socket.readyState === WebSocket.CONNECTING)) {
-                resolve(socket.readyState === WebSocket.OPEN);
+            if (socket && socket.connected) {
+                resolve(true);
                 return;
             }
 
             joined = false;
             intentionalClose = false;
 
+            if (socket) {
+                try {
+                    socket.removeAllListeners();
+                    socket.disconnect();
+                } catch (_) { /* ignore */ }
+                socket = null;
+            }
+
             try {
-                socket = new WebSocket(wsUrl);
+                socket = global.io(socketUrl, {
+                    transports: ['websocket', 'polling'],
+                    reconnection: false,
+                    timeout: 10000,
+                });
             } catch (_) {
                 setStatusDot(false);
                 scheduleReconnect();
@@ -293,7 +310,7 @@
                 return;
             }
 
-            socket.onopen = () => {
+            socket.on('connect', () => {
                 try {
                     lastPongAt = Date.now();
                     sendJoin();
@@ -303,31 +320,24 @@
                     emit('connected', {});
                     resolve(true);
                 } catch (e) {
-                    apexLogError('WebSocket onopen handler failed', e);
+                    apexLogError('Socket.IO connect handler failed', e);
                     resolve(false);
                 }
-            };
+            });
 
-            socket.onmessage = (ev) => {
+            socket.on('apex', (msg) => {
                 try {
-                    const msg = JSON.parse(ev.data);
-                    if (msg && typeof msg === 'object') {
-                        handleMessage(msg);
-                    }
+                    handleMessage(msg);
                 } catch (e) {
-                    apexLogWarn('WebSocket message handling failed', { error: e, data: ev?.data });
+                    apexLogWarn('Socket.IO message handling failed', { error: e, msg });
                 }
-            };
+            });
 
-            socket.onerror = () => {
-                try {
-                    setStatusDot(false);
-                } catch (e) {
-                    apexLogError('WebSocket onerror handler failed', e);
-                }
-            };
+            socket.on('connect_error', () => {
+                setStatusDot(false);
+            });
 
-            socket.onclose = () => {
+            socket.on('disconnect', () => {
                 try {
                     joined = false;
                     setStatusDot(false);
@@ -338,10 +348,10 @@
                     }
                     resolve(false);
                 } catch (e) {
-                    apexLogError('WebSocket onclose handler failed', e);
+                    apexLogError('Socket.IO disconnect handler failed', e);
                     resolve(false);
                 }
-            };
+            });
         });
     }
 
@@ -371,7 +381,7 @@
     }
 
     function isConnected() {
-        return !!(socket && socket.readyState === WebSocket.OPEN && joined);
+        return !!(socket && socket.connected && joined);
     }
 
     if (document.readyState === 'loading') {
@@ -389,9 +399,9 @@
         isConnected,
         get state() {
             if (!socket) return 'Disconnected';
-            if (socket.readyState === WebSocket.CONNECTING) return 'Connecting';
-            if (socket.readyState === WebSocket.OPEN && joined) return 'Connected';
-            if (socket.readyState === WebSocket.OPEN) return 'Open';
+            if (!socket.connected) return 'Connecting';
+            if (joined) return 'Connected';
+            if (socket.connected) return 'Open';
             return 'Disconnected';
         },
     };
