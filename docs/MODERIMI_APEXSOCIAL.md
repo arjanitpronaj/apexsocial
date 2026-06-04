@@ -9,11 +9,11 @@ Dokumentacion operativ (shkurt). Për **udhëzues teknik të plotë** (gjuhët, 
 
 | Pyetje | Përgjigje |
 |--------|-----------|
-| Sa rezultate finale ka? | **ALLOWED**, **REVIEW**, **FORBIDDEN** (REVIEW = nuk publikohet) |
+| Sa rezultate finale ka? | **ALLOWED**, **FORBIDDEN** (binar) |
 | A ndalon keyword ML-in? | **Jo** — keyword shton pikë risku (+16 / +25), ML gjithmonë ekzekutohet |
 | Sa kohë zgjasin 10 sekondat në browser? | Pritje që të pushosh së shkruari — **jo** kohë e modelit |
 | Ku vendoset vendimi final? | Python `analyze()` — kombinim ML% + keyword, pragu **52%** |
-| Çfarë duhet ndezur? | XAMPP (PHP+MySQL), `python api.py` (:5000); C# (:8080) vetëm për SignalR |
+| Çfarë duhet ndezur? | XAMPP (PHP+MySQL), `python api.py` (:5000), `python ws_server.py` (:8080/:8081) |
 
 ---
 
@@ -43,7 +43,7 @@ Përdoruesi (browser)
 | Aplikacioni | PHP 8+ (XAMPP) | `includes/config.php`, `includes/ajax.php` |
 | Baza e të dhënave | MySQL | `database.sql`, tabela `posts`, `content_analysis` |
 | Moderimi AI | Python 3, Flask, sklearn | `ml_api/api.py`, `ml_api/text_utils.py` |
-| Real-time (opsional) | C# ASP.NET Core 8, SignalR | `Backend/Program.cs` (:8080) |
+| Real-time | Python WebSocket | `ml_api/ws_server.py` (:8080 WS, :8081 push) |
 
 ---
 

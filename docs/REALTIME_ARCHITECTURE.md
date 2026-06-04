@@ -1,71 +1,221 @@
-# ApexSocial — Realtime Architecture v6
+# ApexSocial — Realtime Architecture (Native WebSocket)
 
-## Target flow (production)
+## A. Qëllimi
+
+Komunikim **në kohë reale** (jo request/response për çdo njoftim):
+
+- preview ML gjatë shkrimit të postit
+- njoftime (like, mesazhe, etj.)
+- përditësim radhe admin
+- rezultat moderimi për autorin
+- ban live
+
+**Moderimi zyrtar** i postit/komentit mbetet **HTTP REST** (`POST /analyze` në `:5000`) — PHP e thërret në submit.
+
+---
+
+## B. Arkitektura (3 kanale)
 
 ```
-Browser
-  ├─ AJAX → PHP (includes/ajax.php)     … CRUD, moderation authority, MySQL
-  ├─ SignalR → C# :8080/hub             … push only (notifications, queue, live preview)
-  └─ (server) PHP → curl → ML :5000     … classification
+┌──────────── Browser (JavaScript) ────────────┐
+│  realtime.js  →  ws://host:8080  (WebSocket) │  ← kanal i hapur, realtime
+└──────────────────────────────────────────────┘
+                    │
+                    ▼
+         ml_api/ws_server.py (:8080)
+                    │
+    ┌───────────────┴───────────────┐
+    │  JSON mesazhe: join, ping,    │
+    │  preview_moderation, push fan-out │
+    └───────────────┬───────────────┘
+                    │
+         analyze() ←─┘ (vetëm për preview, në thread pool)
 
-PHP after DB write → POST /api/realtime/push (X-Api-Key) → SignalR groups
+┌──────────── PHP (includes/realtime.php) ─────┐
+│  curl POST http://host:8081/api/push         │  ← një kërkesë HTTP, pastaj serveri shtyn te WS
+└──────────────────────────────────────────────┘
+
+┌──────────── PHP (includes/config.php) ─────┐
+│  curl POST http://127.0.0.1:5000/analyze     │  ← moderim në submit (request/response)
+└──────────────────────────────────────────────┘
 ```
 
-## Layers
+| Port | Protokoll | Roli |
+|------|-----------|------|
+| **8080** | WebSocket (`ws://` / `wss://`) | Lidhje e vazhdueshme browser ↔ Python |
+| **8081** | HTTP POST `/api/push` | PHP → fan-out te klientët e lidhur |
+| **5000** | HTTP REST Flask | ML klasifikim (ALLOWED / FORBIDDEN) |
 
-| Layer | Path | Responsibility |
-|-------|------|----------------|
-| Frontend hub client | `assets/js/realtime.js` | One connection, Ping/Pong, reconnect, `previewModeration()` |
-| Frontend UI | `assets/js/app.js` | Toasts, badges, composer (realtime 400ms or AJAX 10s fallback) |
-| PHP bridge | `includes/realtime.php` | `apexRealtimePush()`, helpers |
-| Realtime host | `Backend/Program.cs` | Hub `/hub`, `POST /api/realtime/push`, `GET /health` |
-| ML | `ml_api/api.py` | `/analyze` only (no Socket.IO) |
+---
 
-## SignalR events
+## C. Gjuhët programuese
 
-| Event | Emitter | Audience |
-|-------|---------|----------|
-| `Notification` | PHP (likes, queue, etc.) | `user_{id}` |
-| `NewPending` | PHP (REVIEW post/comment) | `admins` |
-| `QueueUpdate` | PHP (admin queue action) | `admins` |
-| `ModerationResult` | PHP (approve/reject) | author |
-| `Banned` | PHP (admin ban) | `user_{id}` |
-| `LiveModeration` | Hub `PreviewModeration` | caller (composer) |
-| `Pong` | Hub `Ping` | caller (heartbeat) |
+| Shtresë | Gjuha | Skedar |
+|---------|-------|--------|
+| Klient realtime | **JavaScript** | `assets/js/realtime.js` |
+| Server realtime | **Python** | `ml_api/ws_server.py` |
+| Push nga web app | **PHP** | `includes/realtime.php` |
+| ML | **Python** | `ml_api/api.py` |
 
-## CORS
+**Nuk përdoret:** Socket.IO, SignalR, C# Backend.
 
-- No `AllowAnyOrigin` with credentials.
-- Origins: `localhost` / `127.0.0.1` (any port) via `SetIsOriginAllowed`.
-- `BACKEND_URL` derived from `HTTP_HOST` → `http://{host}:8080` (fixes localhost vs 127.0.0.1 mismatch).
+---
 
-## Removed (cleanup)
-
-| Item | Reason |
-|------|--------|
-| `index.html` | Unused static mock |
-| C# REST API (~500 lines in old `Program.cs`) | Duplicated PHP; never called |
-| `ajax.php` `ping` | Dead action |
-| Duplicate ML CSVs in `ml_api/models/` | Copies exist under `models/datasets/` |
-| Inline SignalR in `app.js` | Replaced by `realtime.js` |
-
-## Optional further cleanup
-
-| Item | Notes |
-|------|-------|
-| `admin/scan.php` | Orphan batch tool; keep if admins use it |
-| `admin/posts.php` | Redirect only → link directly to `all_posts.php` |
-| `mlIsOnline()` in config.php | Wire to composer or remove |
-| `Backend/bin`, `Backend/obj` | Add to `.gitignore`; do not commit |
-
-## Run
+## D. Si startohet
 
 ```bash
-# Terminal 1 — ML
-cd ml_api && python api.py
+# Terminal 1 — ML API
+cd ml_api
+pip install -r requirements.txt
+python api.py                 # :5000
 
-# Terminal 2 — Realtime hub
-cd Backend && dotnet run
+# Terminal 2 — WebSocket + push
+cd ml_api
+python ws_server.py           # :8080 (WS) + :8081 (HTTP push)
+
+# Terminal 3 — XAMPP
+# Apache + MySQL, hap http://localhost/apexsocial/
 ```
 
-Open site as `http://localhost/apexsocial` (not `127.0.0.1`) so hub URL matches CORS.
+Kontroll push bridge: `GET http://127.0.0.1:8081/health` → `{"ok":true,"service":"apex-push"}`
+
+---
+
+## E. Autentifikimi (join)
+
+1. PHP llogarit token HMAC: `apexWsJoinToken($userId)` në `includes/realtime.php`
+2. Token injektohet në `window.APEX_USER.wsToken` (`navbar.php`, `admin/inc_sidebar.php`)
+3. Pas `WebSocket` `onopen`, klienti dërgon:
+
+```json
+{"type":"join","user_id":5,"token":"<hex_hmac>"}
+```
+
+4. Serveri verifikon me `WS_SECRET` (env, default `apex-ws-secret`), dritar 5 min (+ dritari i mëparshëm për clock skew)
+5. Përgjigje: `{"type":"joined","user_id":5,"is_admin":false}`
+
+Pa join të suksesshëm, mesazhet e tjera kthejnë `join_required`.
+
+---
+
+## F. Protokolli WebSocket (JSON)
+
+Të gjitha mesazhet janë **tekst JSON** një drejtim.
+
+### Klient → server
+
+| `type` | Fusha | Përshkrim |
+|--------|-------|-----------|
+| `join` | `user_id`, `token` | Autentifikim (herën e parë pas connect) |
+| `ping` | — | Heartbeat aplikacioni |
+| `preview_moderation` | `text` | Analizë ML live (max 8000 chars, rate ~1.2s) |
+
+### Server → klient
+
+| `type` | Përshkrim |
+|--------|-----------|
+| `joined` | Join OK |
+| `pong` | Përgjigje ping |
+| `live_moderation` | Rezultat preview (`verdict`, `harmful_prob`, `category`, …) |
+| `notification` | + `payload` (nga PHP push) |
+| `moderation_result` | + `payload` |
+| `queue_update` | + `payload` |
+| `banned` | + `payload` |
+| `error` | `msg`: `auth_failed`, `rate_limited`, … |
+
+### Emrat PHP → tip wire (fan-out)
+
+| Event PHP (`apexRealtimePush`) | `type` në wire |
+|-------------------------------|----------------|
+| `Notification` | `notification` |
+| `ModerationResult` | `moderation_result` |
+| `QueueUpdate` | `queue_update` |
+| `Banned` | `banned` |
+
+---
+
+## G. PHP push bridge (`:8081`)
+
+```http
+POST /api/push
+X-Api-Key: apex-ws-key-2025   (ose APEX_WS_KEY në env)
+Content-Type: application/json
+
+{
+  "event": "Notification",
+  "user_id": 5,
+  "to_admins": false,
+  "payload": { "msg": "...", "type": "like" }
+}
+```
+
+Përgjigje: `{"sent":true,"delivered":1}`
+
+Funksione helper: `apexNotifyUser()`, `apexModerationResult()`, `apexQueueUpdate()`, `apexUserBanned()`.
+
+---
+
+## H. Klient JavaScript (`ApexRealtime`)
+
+Ngarkohet nga `includes/navbar.php`:
+
+- `window.APEX_WS_URL` — p.sh. `ws://localhost:8080`
+- `window.APEX_USER` — `userId`, `wsToken`, `isAdmin`
+
+API publike (përdoret nga `app.js`):
+
+| Metodë | Përshkrim |
+|--------|-----------|
+| `ApexRealtime.on('Notification', fn)` | Listener eventesh |
+| `ApexRealtime.previewModeration(text)` | Promise preview ML |
+| `ApexRealtime.isConnected()` | `true` pas `joined` |
+| `ApexRealtime.start()` | Rilidhje manuale |
+
+Heartbeat: `ping` çdo 25s, timeout pong 31s, reconnect eksponencial.
+
+---
+
+## I. Composer / post flow (lidhja me realtime)
+
+1. Përdoruesi shkruan → countdown 10s (`app.js`)
+2. Opsional: `ApexRealtime.previewModeration()` përmes WebSocket
+3. Submit → PHP `moderateContent()` → HTTP `:5000/analyze` (autoritativ)
+4. Nëse `FORBIDDEN` → nuk insertohet në DB
+
+Preview WS **nuk** zëvendëson kontrollin server në submit.
+
+---
+
+## J. Variabla mjedisi
+
+| Variabël | Përdorim |
+|----------|----------|
+| `WS_SECRET` | HMAC token join |
+| `APEX_WS_KEY` | Auth header push `/api/push` |
+| `APEX_SESSION_TOKENS` | JSON `user_id → is_admin` për grup admin |
+
+---
+
+## K. Troubleshooting
+
+| Problem | Zgjidhje |
+|---------|----------|
+| Pika e kuqe në navbar | `python ws_server.py` nuk punon ose port 8080 i zënë |
+| `auth_failed` | `WS_SECRET` i ndryshëm PHP vs Python; rifresko faqen (token 5 min) |
+| Preview nuk punon | ML `:5000` offline; WS jo i lidhur |
+| Admin push nuk arrin | `APEX_WS_KEY` i njëjtë; admin duhet `joined` + `is_admin` në session tokens |
+| CSP bllokon WS | `includes/config.php` `connect-src` përfshin `ws://127.0.0.1:8080` |
+
+---
+
+## L. Ndryshim nga Socket.IO / SignalR (historik)
+
+| Teknologji | Status në repo |
+|------------|----------------|
+| C# SignalR `Backend/` | **Hequr** |
+| Socket.IO | **Hequr** — zëvendësuar me WebSocket nativ |
+| **WebSocket nativ** | **Aktual** — `websockets` + `new WebSocket()` |
+
+---
+
+*Përditësuar: arkitektura aktive ApexSocial — Python WebSocket :8080, push :8081, ML HTTP :5000.*

@@ -27,8 +27,8 @@ function adminHead(string $title, bool $chartjs = false): string {
         $uid = (int) $_SESSION['user_id'];
         $base = htmlspecialchars(BASE_URL, ENT_QUOTES, 'UTF-8');
         $wsHost = preg_replace('/:\d+$/', '', $_SERVER['HTTP_HOST'] ?? '127.0.0.1');
-        $socketProto = (!empty($_SERVER['HTTPS']) && $_SERVER['HTTPS'] !== 'off') ? 'https' : 'http';
-        $wsUrl = htmlspecialchars($socketProto . '://' . $wsHost . ':8080', ENT_QUOTES, 'UTF-8');
+        $wsProto = (!empty($_SERVER['HTTPS']) && $_SERVER['HTTPS'] !== 'off') ? 'wss' : 'ws';
+        $wsUrl = htmlspecialchars($wsProto . '://' . $wsHost . ':8080', ENT_QUOTES, 'UTF-8');
         $wsToken = htmlspecialchars(apexWsJoinToken($uid), ENT_QUOTES, 'UTF-8');
         $apexScripts = <<<SCRIPT
 <script>
@@ -36,8 +36,7 @@ window.APEX_BASE = "{$base}";
 window.APEX_USER = { userId: {$uid}, isAdmin: true, wsToken: "{$wsToken}" };
 window.APEX_WS_URL = "{$wsUrl}";
 </script>
-<script src="../assets/js/socket.io.min.js?v=4.7.5"></script>
-<script src="../assets/js/realtime.js?v=rt9"></script>
+<script src="../assets/js/realtime.js?v=rt10"></script>
 SCRIPT;
     }
     return <<<HTML

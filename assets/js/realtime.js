@@ -1,4 +1,4 @@
-// Socket.IO client for ws_server.py (:8080)
+// Native WebSocket client for ws_server.py (:8080)
 (function (global) {
     'use strict';
 
@@ -16,22 +16,16 @@
         return;
     }
 
-    if (typeof global.io !== 'function') {
-        apexLogError('Socket.IO client not loaded', null);
-        global.ApexRealtime = { connected: false, isConnected: () => false };
-        return;
-    }
-
-    function resolveSocketUrl() {
+    function resolveWsUrl() {
         if (global.APEX_WS_URL) {
             return global.APEX_WS_URL;
         }
         const host = global.location.hostname || '127.0.0.1';
-        const proto = global.location.protocol === 'https:' ? 'https:' : 'http:';
+        const proto = global.location.protocol === 'https:' ? 'wss:' : 'ws:';
         return `${proto}//${host}:8080`;
     }
 
-    const socketUrl = resolveSocketUrl();
+    const wsUrl = resolveWsUrl();
     const listeners = new Map();
     let socket = null;
     let heartbeatTimer = null;
@@ -142,13 +136,13 @@
         setPreviewStatus('Allowed — content passed the check', 'allowed');
     }
 
-    function emitApex(obj) {
-        if (!socket || !socket.connected) return false;
+    function sendJson(obj) {
+        if (!socket || socket.readyState !== WebSocket.OPEN) return false;
         try {
-            socket.emit('apex', obj);
+            socket.send(JSON.stringify(obj));
             return true;
         } catch (e) {
-            apexLogError('Socket.IO emit failed', e, obj);
+            apexLogError('WebSocket send failed', e, obj);
             return false;
         }
     }
@@ -164,7 +158,7 @@
         previewSeq += 1;
         const seq = previewSeq;
 
-        if (!socket || !socket.connected || !joined) {
+        if (!socket || socket.readyState !== WebSocket.OPEN || !joined) {
             setPreviewStatus('Real-time preview unavailable', 'offline');
             resolvePreviewWaiters(null);
             return;
@@ -184,7 +178,7 @@
         };
 
         const off = on('LiveModeration', finish);
-        if (!emitApex({ type: 'preview_moderation', text: trimmed })) {
+        if (!sendJson({ type: 'preview_moderation', text: trimmed })) {
             off();
             setPreviewStatus('Real-time preview unavailable', 'offline');
             finish(null);
@@ -215,7 +209,7 @@
     }
 
     function sendJoin() {
-        emitApex({
+        sendJson({
             type: 'join',
             user_id: user.userId,
             token: user.wsToken || '',
@@ -225,19 +219,19 @@
     function startHeartbeat() {
         stopHeartbeat();
         heartbeatTimer = setInterval(() => {
-            if (!socket || !socket.connected) return;
-            emitApex({ type: 'ping' });
+            if (!socket || socket.readyState !== WebSocket.OPEN) return;
+            sendJson({ type: 'ping' });
             if (pongCheckTimer) {
                 clearTimeout(pongCheckTimer);
             }
             pongCheckTimer = setTimeout(() => {
-                if (!socket || !socket.connected) return;
+                if (!socket || socket.readyState !== WebSocket.OPEN) return;
                 if (Date.now() - lastPongAt > 31000) {
                     apexLogWarn('Pong timeout, reconnecting socket');
                     try {
-                        socket.disconnect();
+                        socket.close();
                     } catch (e) {
-                        apexLogError('Socket disconnect after pong timeout failed', e);
+                        apexLogError('Socket close after pong timeout failed', e);
                     }
                     scheduleReconnect();
                 }
@@ -274,35 +268,23 @@
                 emit('LiveModeration', msg);
                 break;
             default:
-                apexLogWarn('Unknown realtime message type', type);
+                apexLogWarn('Unknown WebSocket message type', type);
                 break;
         }
     }
 
     function connect() {
         return new Promise((resolve) => {
-            if (socket && socket.connected) {
-                resolve(true);
+            if (socket && (socket.readyState === WebSocket.OPEN || socket.readyState === WebSocket.CONNECTING)) {
+                resolve(socket.readyState === WebSocket.OPEN);
                 return;
             }
 
             joined = false;
             intentionalClose = false;
 
-            if (socket) {
-                try {
-                    socket.removeAllListeners();
-                    socket.disconnect();
-                } catch (_) { /* ignore */ }
-                socket = null;
-            }
-
             try {
-                socket = global.io(socketUrl, {
-                    transports: ['websocket', 'polling'],
-                    reconnection: false,
-                    timeout: 10000,
-                });
+                socket = new WebSocket(wsUrl);
             } catch (_) {
                 setStatusDot(false);
                 scheduleReconnect();
@@ -310,7 +292,7 @@
                 return;
             }
 
-            socket.on('connect', () => {
+            socket.onopen = () => {
                 try {
                     lastPongAt = Date.now();
                     sendJoin();
@@ -320,24 +302,27 @@
                     emit('connected', {});
                     resolve(true);
                 } catch (e) {
-                    apexLogError('Socket.IO connect handler failed', e);
+                    apexLogError('WebSocket onopen handler failed', e);
                     resolve(false);
                 }
-            });
+            };
 
-            socket.on('apex', (msg) => {
+            socket.onmessage = (ev) => {
                 try {
-                    handleMessage(msg);
+                    const msg = JSON.parse(ev.data);
+                    if (msg && typeof msg === 'object') {
+                        handleMessage(msg);
+                    }
                 } catch (e) {
-                    apexLogWarn('Socket.IO message handling failed', { error: e, msg });
+                    apexLogWarn('WebSocket message handling failed', { error: e, data: ev?.data });
                 }
-            });
+            };
 
-            socket.on('connect_error', () => {
+            socket.onerror = () => {
                 setStatusDot(false);
-            });
+            };
 
-            socket.on('disconnect', () => {
+            socket.onclose = () => {
                 try {
                     joined = false;
                     setStatusDot(false);
@@ -348,10 +333,10 @@
                     }
                     resolve(false);
                 } catch (e) {
-                    apexLogError('Socket.IO disconnect handler failed', e);
+                    apexLogError('WebSocket onclose handler failed', e);
                     resolve(false);
                 }
-            });
+            };
         });
     }
 
@@ -381,7 +366,7 @@
     }
 
     function isConnected() {
-        return !!(socket && socket.connected && joined);
+        return !!(socket && socket.readyState === WebSocket.OPEN && joined);
     }
 
     if (document.readyState === 'loading') {
@@ -399,9 +384,9 @@
         isConnected,
         get state() {
             if (!socket) return 'Disconnected';
-            if (!socket.connected) return 'Connecting';
-            if (joined) return 'Connected';
-            if (socket.connected) return 'Open';
+            if (socket.readyState === WebSocket.CONNECTING) return 'Connecting';
+            if (socket.readyState === WebSocket.OPEN && joined) return 'Connected';
+            if (socket.readyState === WebSocket.OPEN) return 'Open';
             return 'Disconnected';
         },
     };

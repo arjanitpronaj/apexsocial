@@ -1,5 +1,5 @@
 <?php
-/** Socket.IO push bridge: POST /api/push on port 8081. */
+/** WebSocket push bridge: POST /api/push on port 8081 (PHP → ws_server fan-out). */
 
 function apexWsJoinToken(int $userId): string
 {

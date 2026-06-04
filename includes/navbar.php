@@ -12,8 +12,8 @@ $na = function ($key) use ($nav_active) {
 ?>
 <?php
 $wsHost = preg_replace('/:\d+$/', '', $_SERVER['HTTP_HOST'] ?? '127.0.0.1');
-$socketProto = (!empty($_SERVER['HTTPS']) && $_SERVER['HTTPS'] !== 'off') ? 'https' : 'http';
-$apexWsUrl = $socketProto . '://' . $wsHost . ':8080';
+$wsProto = (!empty($_SERVER['HTTPS']) && $_SERVER['HTTPS'] !== 'off') ? 'wss' : 'ws';
+$apexWsUrl = $wsProto . '://' . $wsHost . ':8080';
 $wsToken = isset($me['id']) ? apexWsJoinToken((int) $me['id']) : '';
 ?>
 <script>
@@ -24,8 +24,7 @@ window.APEX_USER = { userId: <?= (int) $me['id'] ?>, isAdmin: <?= isAdminLogged(
 window.APEX_WS_URL = <?= json_encode($apexWsUrl) ?>;
 <?php endif; ?>
 </script>
-<script src="<?= BASE_URL ?>/assets/js/socket.io.min.js?v=4.7.5"></script>
-<script src="<?= BASE_URL ?>/assets/js/realtime.js?v=rt9"></script>
+<script src="<?= BASE_URL ?>/assets/js/realtime.js?v=rt10"></script>
 <nav class="navbar">
     <div class="navbar-inner">
         <button type="button" class="nav-burger" id="nav-burger" aria-label="Open menu" aria-expanded="false">

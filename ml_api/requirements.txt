@@ -15,8 +15,8 @@ openpyxl>=3.1.0
 waitress>=3.0.0
 apscheduler>=3.10.0
 
-# Realtime (Socket.IO + HTTP push bridge)
-python-socketio>=5.11.0
+# Realtime (native WebSocket + HTTP push bridge)
+websockets>=12.0
 aiohttp>=3.9.0
 
 # Optional semantic moderation (install for transformer-based context)
