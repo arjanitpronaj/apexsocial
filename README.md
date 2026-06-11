@@ -1,4 +1,4 @@
-# ApexSocial — Content-Moderated Social Platform
+# ApexSocial — Content-Moderated Social Platform*
 
 A full-stack social media web app with **AI content moderation** via a **Singular C# Architecture**.
 
