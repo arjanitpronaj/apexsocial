@@ -1,0 +1,40 @@
+[115] Abstrakt
+[157] 3. Hipotezat
+[170] 4. Historiku
+[172] 4.1 Rregullat statike dhe listat e zeza (vitet 1990 – fillimi i viteve 2000)
+[174] 4.2 Metodat statistikore dhe mësimi makinerik i hershëm (2010–2016)
+[177] 4.3 Studime të specializuara dhe koleksionet e mëdha të të dhënave (2016–2019)
+[179] 4.4 Sistemet hibride, etika dhe sfidat e zbatuara (2020–sot)
+[183] 5. Metodologjia e punës dhe objektivat
+[184] 5.1 Metodologjia e punës
+[185] Metodologjia e ndjekur në këtë projekt është e organizuar në disa hapa të qartë dhe logjikë, me qëllim që procesi të jetë i kuptueshëm dhe i strukturu
+[193] Implementimi praktik: Në fund, modeli është integruar në platformën ApexSocial, ku çdo postim analizohet automatikisht përpara publikimit përmes PHP (
+[194] 5.2 Objektivat
+[213] 6. Teknologjit e perdorura
+[233] 7. Analiza e machine learning për detektimin dhe eliminimin e përmbajtjeve të dëmshme në rrjete sociale
+[239] 7.1. Natyra dhe tipologjia e përmbajtjeve të dëmshme
+[249] 7.2. Evolucioni historik i qasjeve teknologjike
+[250] Përpjekjet për të automatizuar moderimin e përmbajtjeve kanë një histori relativisht të shkurtër por të pasur me transformime të rëndësishme konceptua
+[255] 7.3. TF-IDF dhe regresioni logjistik
+[264] 7.4. Sfidat e pazgjidhura
+[272] 7.6. Dimensioni etik i moderimit algoritmik
+[274] 7.7. Sistemet hibride dhe roli i mbikëqyrjes njerëzore
+[278] 8. Implementimi i rrjetit social
+[291] 8.1 Arkitektura hibride
+[307] 8.2 Admin paneli (Ndërfaqja e administratorit)
+[320] 9. Detektimin dhe eliminimin e përmbajtjeve të dëmshme
+[324] 9.1 Struktura e sistemit
+[329] 9.2 Dataset-et e trajnimit
+[333] 9.3 Pastrimi i tekstit
+[334] Implementimi fillon me trajnimin e modelit përmes skriptës train_model.py, ku dataset-i lexohet nga file dhe përpunohet duke përdorur Pandas. Teksti p
+[338] 9.4 Trajnimi
+[347] 9.5 Dy modele paralele
+[353] 9.6 Funksioni analizmit
+[359] 9.7 Shmangja e rezultateve false pozitive
+[363] 9.8 Konfigurimi i jashtëm
+[370] 9.9 Endpoint-et REST të API-t python
+[385] 10. Përfundimi
+[387] Pesë hipotezat e ngritura në fillim të punimit kanë gjetur mbështetje empirike nëpërmjet implementimit dhe vlerësimit eksperimental. Hipoteza e parë, 
+[394] Implementimi i qasjes me dy modele specialistë të pavarura (gjuha e urrejtjes dhe mashtrimet/phishing), e cila ka treguar superioritet të matshëm ndaj
+[397] Rezultate dhe arritje kryesore:
+[399] Konfirmim eksperimental i të pesë hipotezave të ngritura, duke vërtetuar lidhjen e drejtpërdrejtë ndërmjet cilësisë së të dhënave, zgjedhjes së algori

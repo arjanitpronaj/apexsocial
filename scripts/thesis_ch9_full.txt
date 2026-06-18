@@ -1,0 +1,87 @@
+9. Detektimin dhe eliminimin e përmbajtjeve të dëmshme
+
+Machine Learning në këtë projekt automatizoi procesin e identifikimit të përmbajtjeve të dëmshme duke e kthyer atë nga kontroll manual në vendimmarrje të menjëhershme të bazuar në të dhëna. Sistemi analizon çdo tekst të postuar dhe merr vendim brenda milisekondave, duke kombinuar tre mekanizma komplementare: kontroll me whitelist dhe fjalëkyçe për raste të njohura, dhe dy modele të pavarura ML për rastet e panjohura.
+
+Baza teknike e sistemit është kombinimi TF-IDF + Logistic Regression, implementuar si Pipeline sklearn. Ky kombinim u zgjodh për balancën optimale ndërmjet saktësisë mbi 94%, shpejtësisë së inferimit, dhe kompleksitetit të menaxhueshëm, duke e bërë sistemin të përshtatshëm për analizë në kohë reale.
+
+9.1 Struktura e sistemit
+
+Sistemi ML ndahet në dy komponentë kryesorë: trajnimi dhe inferimi. Trajnimi kryhet njëherë kur sistemi konfigurohet fillimisht ose kur dataset-et përditësohen. Inferimi kryhet vazhdimisht gjatë punës së platformës, për çdo tekst të postuar.
+
+Figura 7: Arkitektura e sistemit ML për analizën e përmbajtjes në Apex Social
+
+9.2 Dataset-et e trajnimit
+
+Saktësia e çdo modeli ML varet drejtpërdrejt nga cilësia dhe shumëllojshmëria e dataset-it. ApexSocial përdor kater burime të dhënash publike:
+
+Figura 8: Përmbledhje e dataset-eve të përdorura për trajnim dhe modeleve përkatëse
+
+9.3 Pastrimi i tekstit
+
+Implementimi fillon me trajnimin e modelit përmes skriptës train_model.py, ku dataset-i lexohet nga file dhe përpunohet duke përdorur Pandas. Teksti pastrohet përmes funksionit clean(), i cili normalizon të dhënat duke hequr @user dhe karaktere të panevojshme, në mënyrë që modeli të mësojë vetëm nga informacioni relevant.
+
+Sistemi ApexSocial përdor dy modele paralele të pavarura, secilit i dedikuar një kategorie specifike dëmi: pipeline.pkl për gjuhën e urrejtjes dhe scam_pipeline.pkl për mashtrimet/phishing. Kjo ndarje specifike rrit saktësinë duke lejuar optimizim të pavarur të secilit model. Funksioni i pastrimit të tekstit është identik midis trajnimit dhe inferimit, duke siguruar konsistencë:
+
+Figura 9: Funksioni për pastrimin dhe normalizimin e tekstit
+
+9.4 Trajnimi
+
+Modeli ndërtohet si Pipeline i scikit-learn, dy hapa të pavarur (TF-IDF dhe Logistic Regression) të paketuar si objekt i vetëm i serializueshëm. Kur ruhet si .pkl, të dy hapat aplikohen automatikisht gjatë inferimit në të njëjtën renditje si gjatë trajnimit:
+
+Figura 10: Implementimi i pipeline-it të trajnimit me TF-IDF dhe Logistic Regression
+
+TF-IDF e konverton çdo tekst nga varg karakteresh në vektor numerik. Parametri ngram_range=(1,3) do të thotë se modeli mëson jo vetëm nga fjalët e vetme, por edhe nga çiftet dhe treshet fjalësh që kjo e bën atë efektiv për shprehje si "kill yourself" ose "verify your account", ku kuptimi qëndron tek kombinimi, jo tek fjala e vetme.
+
+Logistic Regression merr atë vektor dhe llogarit probabilitetin që teksti të jetë i dëmshëm: vlerë midis 0.0 dhe 1.0.
+
+Parametri class_weight='balanced' është kritik: dataset-et e gjuhës së urrejtjes janë të çbalancuara, rreth 85% shembuj të sigurt dhe 15% të dëmshëm. Pa këtë parametër, modeli do të klasifikonte gjithçka si të sigurt duke arritur saktësi numerike të lartë por duke humbur çdo rast të dëmshëm.
+
+Top of Form
+
+9.5 Dy modele paralele
+
+Projekti trajnon dy modele krejtësisht të pavarura me dataset-e të ndryshme, duke optimizuar secilin për tipologjinë specifike të dëmit. Kjo qasje 'specialist models' performon më mirë sesa një model i vetëm gjithëpërfshirës.
+
+Figura 11: Implementimi i funksionit të trajnimit dhe evaluimit të modelit (train_sklearn)*
+
+Arsyeja e ndarjes qëndron në natyrën gjuhësore të ndryshme të dy kategorive. Gjuha e urrejtjes karakterizohet nga agresion dhe fyerje drejtpërdrejt ndaj personit. Mashtrimet karakterizohen nga urgjencë artificiale, premtime monetare dhe kërkesa për të dhëna personale. Një model i vetëm gjithëpërfshirës ngatërronte tiparet e të dy kategorive. Dy modele specialistë lejojnë optimizim të pavarur dhe performojnë më mirë secili në fushën e vet.
+
+9.6 Funksioni analizmit
+
+Kur PHP (moderateContent) ose ws_server.py dërgon tekst te endpoint-i /analyze, funksioni analyze() zbaton nivele kontrolli të njëpasnjëshme (siguri, integritet Unicode, fjalëkyçe, ML, kontekst). Secili nivel kontribuon në combined_score; nëse score ≥ 52%, përmbajtja klasifikohet FORBIDDEN, përndryshe ALLOWED.
+
+Figura 12: Implementimi i funksionit analyze() për analizën e përmbajtjes
+
+Logjika e tre niveleve është e organizuar sipas kostos së llogaritjes. Kontrolli me fjalëkyçe (Niveli 1) është shumë më i shpejtë se thirrja e modelit ML. Rastet e qarta dhe të njohura zgjidhen menjëherë pa aktivizuar modelin, ndërkohë ML-ja rezervohet për tekstet e panjohura e të paqarta.
+
+9.7 Shmangja e rezultateve false pozitive
+
+Kontrolli i thjeshtë if kw in text do të bllokonte fjalë të padjallëzuara si "skill" sepse përmban "kill", ose "classical" sepse përmban "ass". Funksioni kw_hit_boundary() e zgjidh këtë duke kërkuar kufij të saktë të fjalës (\b) për fjalët e vetme:
+
+Figura 13: Implementimi i funksionit kw_hit_boundary() për reduktimin e false positive
+
+9.8 Konfigurimi i jashtëm
+
+Të gjithë parametrat operacionalë ruhen në models/config.json dhe lexohen çdo herë që API-a niset. Kjo qasje lejon rregullimin e pragut apo shtimin e fjalëkyçeve të reja pa prekur kodin burimor dhe pa ri-trajnuar modelin:
+
+Figura 14: Konfigurimi i parametrave të sistemit përmes skedarit config.json
+
+Funksioni update_config () ekzekutohet automatikisht pas çdo trajnimi dhe garanton që pragu të mos bjerë nën vlerën minimale 0.50 — nën të cilën sistemi do të fillonte të flagonte sasi të mëdha tekstesh normale si të dëmshme:
+
+Figura 15: Implementimi i funksionit update_config() për përditësimin e parametrave të konfigurimit
+
+9.9 Endpoint-et REST të API-t python
+
+Integrim të plotë me PHP, WebSocket dhe analizë në kohë reale:
+
+Figura 16: Endpoint-et REST dhe funksionaliteti i API-së në Python
+
+PHP dërgon kërkesë POST /analyze (ose preview përmes WebSocket) me:
+
+Figura 17: Logjika e vendimmarrjes
+
+Pas implementimit të logjikës së analizës në backend, rezultatet reflektohen drejtpërdrejt në ndërfaqen e përdoruesit. Siç paraqitet në Figurën 20, përdoruesi gjatë shkrimit të një postimi merr feedback të menjëhershëm nga sistemi lidhur me përmbajtjen e tij.
+
+Figura 18: Shfaqja e rezultatit të analizës në ndërfaqen e përdoruesit
+
+Në këtë shembull, teksti i futur përmban gjuhë fyese ndaj një individi dhe klasifikohet si përmbajtje e ndaluar. Sistemi shfaq mesazhin “Forbidden – Content contains hate speech or harassment”, duke informuar përdoruesin për arsyen e bllokimit dhe duke parandaluar publikimin e postimit. Ky mekanizëm i feedback-ut në kohë reale ndihmon përdoruesin të korrigjojë përmbajtjen para publikimit dhe kontribuon në rritjen e cilësisë së komunikimit në platformë.

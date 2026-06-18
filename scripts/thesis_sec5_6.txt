@@ -1,0 +1,215 @@
+---115---
+Abstrakt
+
+---116---
+Në kuadër të këtij projekti, synimi kryesor ka qenë analiza, projektimi dhe implementimi i një sistemi inteligjent për detektimin dhe bllokimin automatik të përmbajtjeve të dëmshme në rrjetet sociale. Për këtë qëllim është zhvilluar platforma sociale ApexSocial, e cila integron teknika të Machine Learning në proceset e publikimit dhe moderimit të përmbajtjes. Sistemi bazohet në një arkitekturë hibride: PHP (XAMPP) për aplikacionin web dhe MySQL, Python Flask API (porti 5000) për analizën ML, dhe ws_server.py (WebSocket 8080, HTTP push 8081) për komunikim në kohë reale. Vendimi i moderimit është binar (ALLOWED / FORBIDDEN). Implementimi përfshin modele trajnimi që kombinojnë TF-IDF me Logistic Regression, të cilat janë trajnuar mbi dataset-e publike për identifikimin e gjuhës së urrejtjes dhe përmbajtjeve mashtruese. Rezultatet e analizës dhe testimit konfirmojnë se sistemi arrin një saktësi mbi 94% në klasifikimin automatik të përmbajtjes, duke ofruar feedback të menjëhershëm përpara publikimit.
+
+---117---
+Fjalë kyçe: moderim i përmbajtjes, inteligjencë artificiale, arkitekturë singurale, Scikit-learn, TF-IDF, platforma sociale, sigurisë kibernetike
+
+---120---
+Abstract
+
+---121---
+This project presents analyze, design, and implement an intelligent system for the automated detection and blocking of harmful content on social networks. To achieve this, the ApexSocial social platform was developed, integrating Machine Learning techniques into the content publishing and moderation processes. The system uses a hybrid architecture: PHP (XAMPP) for the web application and MySQL, a Python Flask ML API (port 5000) for classification, and ws_server.py (WebSocket 8080, HTTP push 8081) for real-time events. Moderation verdicts are binary (ALLOWED / FORBIDDEN). The implementation involves training models that combine TF-IDF with Logistic Regression, trained on public datasets to identify hate speech and deceptive content. Analysis and testing results indicate that the system achieves over 94% accuracy in automated content classification, providing immediate feedback prior to publication.
+
+---122---
+Keywords: content moderation, artificial intelligence, hybrid architecture, WebSocket, Scikit-learn, TF-IDF, social platform, cybersecurity
+
+---125---
+Hyrje
+
+---126---
+Në një epokë të karakterizuar nga zhvillimi i shpejtë i teknologjisë dhe digjitalizimi i komunikimit njerëzor, rrjetet sociale kanë marrë një rol qendror në mënyrën se si individët ndërveprojnë, ndajnë informacione dhe formojnë perceptimet e tyre mbi botën, duke krijuar një hapësirë virtuale dinamike ku prodhimi dhe shpërndarja e përmbajtjes ndodh në kohë reale dhe në një shkallë masive, mirëpo kjo rritje eksponenciale e komunikimit digjital ka sjellë edhe sfida të shumta që lidhen me sigurinë, etikën dhe kontrollin e përmbajtjes, pasi përveç përfitimeve të shumta që ofrojnë këto platforma, ato janë bërë gjithashtu terren i përshtatshëm për shpërndarjen e përmbajtjeve të dëmshme, duke përfshirë gjuhën e urrejtjes, dezinformimin, bullizmin kibernetik, manipulimin e opinionit publik dhe materiale të papërshtatshme që mund të kenë ndikime serioze në mirëqenien psikologjike të individëve dhe në stabilitetin shoqëror në përgjithësi, dhe përballja me këtë fenomen kërkon qasje të avancuara që tejkalojnë metodat tradicionale të moderimit manual, të cilat shpesh janë të ngadalta, subjektive dhe joefikase për shkak të volumit të madh të të dhënave që duhet të analizohen, prandaj përdorimi i teknikave të Machine Learning paraqet një zgjidhje të fuqishme dhe të domosdoshme për adresimin e këtij problemi, duke mundësuar ndërtimin e sistemeve inteligjente që janë në gjendje të analizojnë automatikisht përmbajtjen, të identifikojnë modele të sjelljes së dëmshme dhe të marrin vendime në kohë reale për filtrimin ose eliminimin e saj, ky projekt fokusohet pikërisht në përdorimin e Machine Learning për detektimin dhe eliminimin e përmbajtjeve të dëmshme në rrjete sociale, duke ofruar një analizë të thelluar teorike dhe një implementim praktik që demonstron se si algoritmet e mësimit makinerik mund të trajnohen për të njohur dhe klasifikuar përmbajtje problematike bazuar në karakteristika të ndryshme si teksti, konteksti dhe modelet e përdorimit, në kuadër të këtij projekti trajtohen konceptet themelore të Machine Learning, duke përfshirë mësimin e mbikëqyrur dhe të pambikëqyrur, përzgjedhjen e veçorive dhe përdorimin e modeleve klasifikuese si regresioni logjistik, pemët vendimmarrëse apo rrjetet nervore, të cilat luajnë një rol kyç në analizimin e përmbajtjeve tekstuale dhe identifikimin e elementeve të dëmshme, gjithashtu projekti përfshin mbledhjen dhe përpunimin e të dhënave, që është një hap kritik në ndërtimin e një sistemi të besueshëm, pasi cilësia dhe diversiteti i të dhënave ndikojnë drejtpërdrejt në performancën e modelit, duke përfshirë pastrimin e të dhënave, normalizimin dhe etiketimin e tyre për të krijuar një dataset të përshtatshëm për trajnim dhe testim, më tej realizohet implementimi praktik i një modeli Machine Learning që trajnohet mbi të dhëna reale ose të simuluara për të klasifikuar përmbajtjet në kategori të sigurta dhe të dëmshme, duke përdorur metrika vlerësimi si saktësia (accuracy), precizioni (precision), rikthimi (recall) dhe F1-score për të analizuar performancën e modelit dhe për të identifikuar përmirësime të mundshme, një aspekt i rëndësishëm i këtij projekti është gjithashtu diskutimi i sfidave dhe kufizimeve që lidhen me përdorimin e Machine Learning në këtë kontekst, siç janë paragjykimet në të dhëna (bias), vështirësia në interpretimin e kontekstit dhe ironisë në gjuhën njerëzore, si dhe çështjet etike që lidhen me censurën dhe privatësinë e përdoruesve, duke theksuar nevojën për zhvillimin e sistemeve transparente dhe të drejta që respektojnë të drejtat e individëve ndërkohë që mbrojnë komunitetin nga përmbajtjet e dëmshme, përmes këtij projekti synohet të demonstrohet se si integrimi i teknologjive të avancuara të Machine Learning mund të kontribuojë në krijimin e një mjedisi më të sigurt dhe më të kontrolluar në rrjetet sociale, duke reduktuar ndikimin negativ të përmbajtjeve të dëmshme dhe duke promovuar një komunikim më të shëndetshëm dhe konstruktiv në hapësirën digjitale, duke ofruar një qasje të balancuar midis inovacionit teknologjik dhe përgjegjësisë shoqërore, për më tepër ky projekt synon të theksojë rëndësinë e integrimit të inteligjencës artificiale në sistemet moderne të moderimit të përmbajtjes si një mjet thelbësor për përballimin e sfidave që paraqet epoka digjitale, duke u fokusuar jo vetëm në aspektin teknik të zhvillimit të modeleve por edhe në ndikimin e tyre praktik në botën reale, ku aplikimi i suksesshëm i këtyre teknologjive mund të ndihmojë në ndërtimin e një ekosistemi digjital më të sigurt dhe më të besueshëm, gjithashtu duke marrë parasysh evolucionin e vazhdueshëm të përmbajtjeve të dëmshme dhe mënyrave të reja të shpërndarjes së tyre, projekti thekson nevojën për sisteme adaptive që mund të përmirësohen vazhdimisht përmes të dhënave të reja dhe trajnimit të vazhdueshëm, duke siguruar që këto sisteme të mbeten efektive edhe përballë sfidave të reja, në këtë mënyrë kontribuohet jo vetëm në aspektin akademik dhe teknologjik por edhe në atë shoqëror, duke promovuar përdorimin e përgjegjshëm të teknologjisë dhe duke ndihmuar në krijimin e një hapësire digjitale më të shëndetshme për të gjithë përdoruesit.
+
+---134---
+2. Rishikimi i literaturës
+
+---135---
+Qëllimi i këtij kapitulli është të vendosë punën aktuale në dialog me studimet ekzistuese, duke shqyrtuar arritjet e hulumtuesve të tjerë, kufizimet e qasjeve të tyre dhe mënyrën se si projekti ApexSocial u jep përgjigje atyre boshllëqeve. Kapitulli trajton pesë fusha kryesore: klasifikimin e tekstit nëpërmjet mësimit makinerik, zbulimin e gjuhës së urrejtjes, rolin e rrjeteve nervore dhe modeleve të gjuhës, moderimin e platformave dixhitale dhe zbulimin e mashtrimeve.
+
+---136---
+2.1 Mësimi makinerik dhe klasifikimi i tekstit
+
+---137---
+Themelet teorike të klasifikimit të tekstit u vendosën nga Manning, Raghavan dhe Schütze, të cilët argumentuan se metoda e peshimit statistikor të termave mbetet ndër zgjidhjet më të efektshme, pavarësisht thjeshtësisë relative . Aggarwal dhe Zhai shtuan se saktësia e rezultateve nuk varet vetëm nga algoritmi i zgjedhur, por në masë të madhe edhe nga mënyra e paraqitjes dhe organizimit të veçorive gjuhësore të tekstit .
+
+---138---
+Projekti ApexSocial i zbaton këto parime teorike në mënyrë të drejtpërdrejtë. Sistemi i ndërtuar mbështetet në peshimin statistikor të termave, duke marrë parasysh jo vetëm fjalët e vetme, por edhe grupet prej dy e tre fjalësh të njëpasnjëshme. Kjo zgjedhje është vendimtare për shprehje të dëmshme ku kuptimi nuk rrjedh nga secila fjalë veç e veç, por nga bashkimi i tyre. Një veçori dalluese e zbatimit tonë lidhet me trajtimin e pabarazisë numerike midis kategorive: meqenëse shumica e teksteve janë të padëmshme, modeli ka tendencën natyrale të anojë drejt atyre. Ky problem u adresua nëpërmjet rregullimit të peshave të klasave, element i cili shpesh anashkalohet në studimet me karakter thjesht akademik.
+
+---140---
+2.2 Zbulimi i gjuhës së urrejtjes
+
+---141---
+Waseem dhe Hovy realizuan një nga studimet e hershme dhe më të cituara në fushën e zbulimit automatik të gjuhës ofenduese, duke demonstruar se veçoritë gjuhësore të nivelit të karaktereve, bashkë me kontekstin e autorit, rrisin ndjeshëm cilësinë e klasifikimit . Davidson et al. ndërtuan një koleksion të dhënash të gjerë nga platformat sociale dhe arritën saktësi mbi nëntëdhjetë për qind duke kombinuar lloje të ndryshme veçorisht . Nobata et al. propozuan një qasje të integruar duke bashkuar tregues gjuhësorë, semantikë dhe strukturorë, duke arritur rezultate të kënaqshme edhe në kontekste komunikimi të ndryshme . Mullah dhe Owusu-Acheampong krahasuan gjashtëdhjetë modele klasifikimi dhe vërtetuan se metodat e thjeshta statistikore mbeten konkurruese kur koleksioni i të dhënave është i cilësisë së lartë .
+
+---142---
+ApexSocial ngrihet mbi këto arritje: koleksioni i të dhënave i ndërtuar nga Davidson et al. shërben si burimi kryesor i trajnimit të modelit, me afërsisht njëzet e pesë mijë shembuj të etiketuar . Saktësia e arritur nga sistemi ynë, mbi nëntëdhjetë e katër për qind, është e krahasueshme me gjetjet e literaturës. Kontributi ynë specifik qëndron në zgjerimin e fushës: ApexSocial nuk kufizohet vetëm në gjuhën e urrejtjes, por mbulon edhe kategoritë e mashtrimit dhe phishing-ut nëpërmjet dy modeleve të pavarura dhe të specializuara, qasje e mbështetur nga studimet e fundit.
+
+---143---
+2.3 Rrjetet nervore dhe modelet e gjuhës
+
+---144---
+Goodfellow, Bengio dhe Courville hodhën bazat matematikore të rrjeteve nervore artificiale dhe mësimit të thellë, duke hapur rrugën drejt modeleve shumë më të sofistikuara të analizës gjuhësore . Devlin et al. prezantuan modelin BERT, i cili arriti rezultate të papara deri atëherë në shumë detyra të kuptimit të tekstit, duke kapur marrëdhëniet e kontekstit në të dyja drejtimet e fjalisë . Siino, duke rishikuar literaturën bashkëkohore, raportoi saktësi deri në nëntëdhjetë e tetë për qind me modele të tilla në zbulimin e gjuhës së urrejtjes . Megjithatë, Ghosh dhe Veale vërejtën se edhe modelet më të avancuara arrijnë vetëm shtatëdhjetë deri tetëdhjetë për qind saktësi në zbulimin e ironisë dhe sarkazmës, çka tregon se kuptimi i thellë i gjuhës njerëzore mbetet sfidë e hapur .
+
+---145---
+ApexSocial zgjedh me vetëdije të mos mbështetet në këto modele të sofistikuara në versionin e tij aktual. Kjo zgjedhje nuk buron nga padituria teknike, por nga vlerësimi pragmatik i kushteve të zbatimit: modele të tilla kërkojnë burime llogaritëse të kushtueshme dhe kohë përgjigje të papajtueshme me analizën e menjëhershme gjatë shkrimit . Integrimi i modeleve gjuhësore të përshtatura për shqipen mbetet një drejtim i rëndësishëm i zhvillimit të ardhshëm.
+
+---146---
+2.4 Moderimi i platformave dixhitale
+
+---147---
+Gillespie analizoi politikat e moderimit të përmbajtjes në platformat e mëdha sociale dhe argumentoi se këto kompani kanë marrë në dorë rolin e portierëve të komunikimit publik, duke u gjendur vazhdimisht midis detyrimit për të mbrojtur përdoruesit dhe nevojës për të respektuar lirinë e shprehjes . Roth et al. krahasuan sistemet tërësisht të automatizuara me ato që mbështeten vetëm në gjykim njerëzor dhe nxorën përfundimin se asnjëra skajshmëri nuk jep rezultate të pranueshme . Sculley et al. rekomanduan ndarjen e qartë të shtresave funksionale dhe rregullimin e parametrave të sistemit jashtë kodit burimor, si kusht themelor për mirëmbajtjen afatgjatë .
+
+---148---
+ApexSocial i zbaton këto rekomandime në mënyrë sistematike: modeli i mësimit makinerik funksionon i ndarë nga logjika qendrore e sistemit, parametrat e funksionimit ruhen në skedar të jashtëm konfigurimi dhe paneli i administratorit mundëson mbikëqyrje njerëzore për rastet e paqarta. Ndryshimi kryesor qëndron në qasjen ndaj kohës: ApexSocial vepron para publikimit, jo pas tij, duke i dhënë sistemit karakter parandalues . Për më tepër, ndërtimi arkitekturor garanton që asnjë kërkesë të mos arrijë direkt te modeli i analizës, por të kalojë detyrimisht nëpërmjet një bërthame qendrore. Ky aspekt i sigurisë nuk trajtohet nga asnjë nga studimet e rishikuara.
+
+---149---
+2.5 Zbulimi i mashtrimeve
+
+---150---
+Islam dhe Uddin demonstruan se metodat e përpunimit gjuhësor të tekstit arrijnë saktësi shumë të lartë në zbulimin e mesazheve mashtruese, duke përdorur koleksione të dhënash nga komunikimi cellular . Guo propozoi qasje të bazuara në rrjete marrëdhëniesh për zbulimin e adresave të rreme të internetit . Tran dhe Nguyen testuan mundësinë e zbulimit të phishing-ut nëpërmjet modeleve të mëdha gjuhësore dhe raportuan rezultate të kënaqshme, por jo superiore ndaj metodave tradicionale .
+
+---151---
+Sistemi i ndërtuar bashkon zbulimin e mesazheve mashtruese dhe të adresave të rreme në një model të vetëm, të trajnuar mbi treqind e njëzet mijë shembuj nga burime të ndryshme publike. Shumëllojshmëria e burimeve të trajnimit rrit aftësinë e modelit për të përgjithësuar, çka reflektohet edhe në rezultatet tona . Ndryshimi themelor nga studimet e sipërcituara qëndron jo në teknikën e zbatuar, por në integrimin: ata e trajtojnë zbulimin e mashtrimit si problem të izoluar, ndërkohë ApexSocial e vendos atë si pjesë të një sistemi të plotë moderimi.
+
+---152---
+2.6 Sinteza dhe vendosja në kontekst
+
+---153---
+Shqyrtimi i literaturës zbulon disa tendenca të qëndrueshme: studimet akademike zakonisht fokusohen në një kategori të vetme dëmi, vlerësojnë modelet si prototipe laboratorike pa i vendosur në mjedise reale dhe nuk i trajtojnë aspektet arkitekturore dhe të sigurisë si pjesë të problemit kërkimor. ApexSocial dallohet në të gjitha këto drejtime: bashkon dy kategori dëmi nëpërmjet modeleve specialiste, realizon zbatimin e plotë në platformë funksionale dhe trajton sigurinë arkitekturore si element të barasvlershëm me saktësinë e modelit.
+
+---154---
+Megjithatë, projekti ndan edhe kufizime të njohura nga literatura. Vështirësia me ironinë dhe sarkazmën u vërejt edhe gjatë testimit të sistemit tonë. Fortuna dhe Nunes paralajmërojnë se performanca e modeleve bie ndjeshëm pas një viti e gjysmë pa ri-trajnim, për shkak të evoluimit të vazhdueshëm të gjuhës dhe shprehjeve të reja . Ky problem është adresuar vetëm pjesërisht nga ApexSocial. Kufizimi më i rëndësishëm afatgjatë mbetet mungesa e koleksioneve të etiketuara të të dhënave në gjuhën shqipe, e cila pengon zgjerimin e sistemit në kontekstin vendor. Në tërësi, rishikimi tregon se ApexSocial ngrihet mbi bazë teorike të qëndrueshme dhe e zgjon atë në drejtime praktike e arkitekturore që literatura ekzistuese nuk i ka trajtuar mjaftueshëm.
+
+---157---
+3. Hipotezat
+
+---159---
+H1: A mundet kompjuteri te dalloje vete nje shkrim te keq nga nje i zakonshëm?
+
+---160---
+Pergjigja: Po. Sistemi arriti saktësi mbi 94%, që do të thotë se nga 100 tekste, mbi 94 i gjykon saktë.
+
+---161---
+H2:A e bën sistemi me te veshtire per dikë me qellime te keqija qe te anashkaloje kontrollin?
+
+---162---
+Pergjigja: Po. Ndertimi i sistemit me nje pike te vetme kalimi e beri te pamundur komunikimin e drejtperdrejte me modelin pa kaluar vertëtimin.
+
+---163---
+H3. A ka rendesi me çfare shembujsh mesohet sistemi?
+
+---164---
+Pergjigja: Po. Pastrimi i mire i shembujve te trajnimit solli permiresim te dukshem te saktesise.
+
+---165---
+H4:A behet sistemi me i mençur sa me shume raste te shoje?
+
+---166---
+Pergjigja: Pjeserisht. Rezultatet fillestare e mbeshtesin kete, por ri-trajnimi automatik mbetet ende i pazbatuar plotesisht.
+
+---170---
+4. Historiku
+
+---171---
+Zhvillimi i teknologjive për detektimin dhe kontrollin e përmbajtjeve të dëmshme në rrjete sociale nuk mund të kuptohet ndaras nga evolucioni i vetë internetit si hapësirë komunikimi njerëzor. Ky evolucion mund të ndahet në disa faza të qarta, secila e karakterizuar nga qasje të ndryshme teknologjike dhe kontribues të rëndësishëm shkencorë.
+
+---172---
+4.1 Rregullat statike dhe listat e zeza (vitet 1990 – fillimi i viteve 2000)
+
+---173---
+Në fazat e hershme të internetit, kontrolli i përmbajtjes mbështetej kryesisht në ndërhyrje manuale nga administratorët dhe lista statike të fjalëve të ndaluara. Volumi i të dhënave ishte i menaxhueshëm dhe moderimi njerëzor funksiononte relativisht mirë. Megjithatë, këto metoda kishin disfunksione themelore: prodhonin numër të lartë gabimesh dhe anashkaloheshin lehtësisht nga aktorët me qëllime të këqija. Themelet teorike për kalimin drejt metodave më të sofistikuara u hodhën nga Manning, Raghavan dhe Schütze, të cilët argumentuan se metoda e peshimit statistikor të termave mbetet ndër zgjidhjet më efikase për klasifikimin e tekstit, pavarësisht thjeshtësisë relative . Aggarwal dhe Zhai shtuan se saktësia e rezultateve nuk varet vetëm nga algoritmi i zgjedhur, por në masë të madhe edhe nga mënyra e paraqitjes dhe organizimit të veçorive gjuhësore të tekstit, vërejtje kjo që do të orientonte kërkimin e ardhshëm drejt rëndësisë së cilësisë së të dhënave .
+
+---174---
+4.2 Metodat statistikore dhe mësimi makinerik i hershëm (2010–2016)
+
+---175---
+Me rritjen eksponenciale të rrjeteve sociale, moderimi njerëzor u bë i pamundur. Kjo nevojë e shtyu kërkimin shkencor drejt automatizimit. Goodfellow, Bengio dhe Courville hodhën bazat matematikore të mësimit të thellë dhe rrjeteve nervore artificiale, duke hapur perspektiva të reja për analizën e tekstit në shkallë të madhe . Paralel me zhvillimin teorik, studiuesit filluan të ndërtojnë koleksione të dhënash dhe të testojnë modele konkrete. Nobata et al. propozuan një qasje të integruar duke bashkuar tregues gjuhësorë, semantikë dhe strukturorë për zbulimin e gjuhës abuzive në platformat sociale, duke arritur rezultate të kënaqshme edhe në kontekste të ndryshme komunikimi . Algoritmet e hershme si Naive Bayes dhe regresioni logjistik u vërtetuan efektive për klasifikimin e tekstit, ndërsa modele si Support Vector Machines rritën ndjeshëm saktësinë. Russell dhe Norvig dokumentuan me hollësi themelet teorike të inteligjencës artificiale, duke ofruar një kornizë të gjerë konceptuale që orientoi shumë studime të mëvonshme .
+
+---177---
+4.3 Studime të specializuara dhe koleksionet e mëdha të të dhënave (2016–2019)
+
+---178---
+Kjo periudhë shënon konsolidimin e fushës si disiplinë e pavarur kërkimore. Waseem dhe Hovy realizuan një nga studimet më të cituara në zbulimin automatik të gjuhës ofenduese, duke demonstruar se veçoritë gjuhësore të nivelit të karaktereve, bashkë me kontekstin e autorit, rrisin ndjeshëm cilësinë e klasifikimit . Davidson et al. ndërtuan një koleksion të dhënash të gjerë me rreth njëzet e pesë mijë shembuj të etiketuar manualisht dhe arritën saktësi mbi nëntëdhjetë për qind duke kombinuar lloje të ndryshme veçorish; ky koleksion ka shërbyer si bazë trajnimi për shumë sisteme, duke përfshirë edhe ApexSocia l. Fortuna dhe Nunes realizuan një rishikim të gjerë të literaturës dhe paralajmëruan se performanca e modeleve përkeqësohet ndjeshëm brenda dymbëdhjetë deri tetëmbëdhjetë muajve pa ri-trajnim, për shkak të evoluimit të vazhdueshëm të gjuhës . Dixon et al. identifikuan një problem kritik etik: klasifikatorët shpesh diskriminojnë ndaj grupeve të minoritetit, duke shënuar si të dëmshme tekste që thjesht përmbajnë identitetin e tyre . Gillespie analizoi dimensionin socio-politik të moderimit, argumentando se platformat online kanë marrë rolin e portierëve të komunikimit publik me autoritet të madh shoqëror . Devlin et al. prezantuan modelin BERT, i cili arriti rezultate të papara deri atëherë në shumë detyra të përpunimit të gjuhës natyrore duke kapur marrëdhëniet e kontekstit në të dyja drejtimet e fjalisë .
+
+---179---
+4.4 Sistemet hibride, etika dhe sfidat e zbatuara (2020–sot)
+
+---180---
+Ndërkohë që modelet bëheshin gjithnjë e më të fuqishme, sfidat praktike dhe etike erdhën në qendër të debatit. Roth et al. krahasuan sistemet tërësisht të automatizuara me ato njerëzore dhe konkluduan se asnjëra skajshmëri nuk jep rezultate të pranueshme: e para prodhon gabime të tepërta, e dyta nuk mund të mbajë hap me vëllimet e mëdha. Kjo çoi drejt konsensusit se sistemet hibride janë zgjidhja optimale . Sculley et al. dokumentuan borxhin teknik të fshehur në sistemet e mësimit makinerik të prodhimit dhe rekomanduan ndarjen e qartë të shtresave funksionale si kusht themelor për mirëmbajtjen afatgjatë, parim i zbatuar drejtpërdrejt në arkitekturën e ApexSocial . Barocas dhe Selbst vërtetuan se paragjykimet e pranishme në koleksionet trajnuese reprodukohen dhe amplifohen sistematikisht nga modelet, duke çuar në diskriminim algoritmik . Ghosh dhe Veale treguan se edhe modelet më të avancuara arrijnë vetëm shtatëdhjetë deri tetëdhjetë për qind saktësi në zbulimin e ironisë dhe sarkazmës, problem i cili mbetet i hapur edhe sot . Siino, duke rishikuar literaturën bashkëkohore, raportoi saktësi deri në nëntëdhjetë e tetë për qind me modele transformer në zbulimin e gjuhës së urrejtjes, por vuri në dukje se performanca ndryshon ndjeshëm sipas kontekstit dhe gjuhës . Islam dhe Uddin demonstruan se metodat e përpunimit gjuhësor arrijnë saktësi shumë të lartë në zbulimin e mesazheve mashtruese ...
+
+---181---
+Kjo trajektore historike tregon se fusha ka evoluuar nga metodat e thjeshta manuale drejt sistemeve inteligjente dhe adaptive.
+
+---183---
+5. Metodologjia e punës dhe objektivat
+
+---184---
+5.1 Metodologjia e punës
+
+---185---
+Metodologjia e ndjekur në këtë projekt është e organizuar në disa hapa të qartë dhe logjikë, me qëllim që procesi të jetë i kuptueshëm dhe i strukturuar:
+
+---186---
+Hulumtimi dhe analiza e literaturës: Fillimisht është realizuar një hulumtim i detajuar mbi konceptet e Machine Learning dhe moderimin automatik të përmbajtjes, duke analizuar studime ekzistuese dhe qasje të ndryshme për detektimin e përmbajtjeve të dëmshme në rrjetet sociale.
+
+---187---
+Definimi i problemit: Është përcaktuar problemi kryesor që trajton projekti ApexSocial, i cili konsiston në identifikimin automatik të përmbajtjeve të dëmshme si gjuha e urrejtjes, phishing-u dhe mesazhet mashtruese.
+
+---188---
+Mbledhja e të dhënave: Janë mbledhur dataset-e publike tekstuale nga burime si Kaggle dhe koleksione akademike, të cilat përmbajnë përmbajtje të etiketuara si të sigurta ose të dëmshme për trajnim dhe testim të modelit.
+
+---189---
+Përpunimi i të dhënave (Preprocessing)L Të dhënat janë pastruar dhe përgatitur për analizë përmes heqjes së URL-ve, karaktereve speciale dhe elementeve të panevojshme, si dhe normalizimit të tekstit për të përmirësuar performancën e modelit.
+
+---190---
+Përzgjedhja e veçorive (Feature Selection): Janë identifikuar karakteristikat kryesore të tekstit duke përdorur metodën TF-IDF për paraqitjen numerike dhe analizimin e rëndësisë së termave në dokumente.
+
+---191---
+Ndërtimi dhe trajnimi i modelit: Është zhvilluar modeli i Machine Learning duke përdorur algoritmin Logistic Regression përmes Scikit-learn Pipeline, duke kombinuar transformimin e tekstit dhe klasifikimin në një strukturë të vetme funksionale.
+
+---192---
+Testimi dhe vlerësimi: Performanca e modelit është vlerësuar përmes metrikave si accuracy, precision, recall dhe F1-score, të cilat tregojnë efektivitetin e sistemit në klasifikimin e përmbajtjeve të dëmshme.
+
+---193---
+Implementimi praktik: Në fund, modeli është integruar në platformën ApexSocial, ku çdo postim analizohet automatikisht përpara publikimit përmes PHP (moderateContent) që komunikon me Python Flask API (:5000), me preview në kohë reale përmes WebSocket (ws_server.py), duke mundësuar moderim para publikimit.
+
+---194---
+5.2 Objektivat
+
+---196---
+Zhvillimi i një sistemi inteligjent për detektimin e përmbajtjeve të dëmshme
+
+---197---
+Analizimi i performancës së algoritmeve të Machine Learning
+
+---198---
+Përmirësimi i saktësisë në klasifikimin e përmbajtjeve tekstuale
+
+---199---
+Identifikimi i metodave më efikase për filtrimin e përmbajtjeve
+
+---200---
+Demonstrimi praktik i përdorimit të Machine Learning në këtë fushë
+
+---213---
+6. Teknologjit e perdorura
+
+---214---
+Në këtë projekt fillimisht është krijuar një aplikacion i thjeshtë në formë rrjeti social për të mundësuar publikimin dhe testimin e përmbajtjeve nga përdoruesit, ndërsa më pas është integruar një model i Machine Learning për analizimin dhe klasifikimin automatik të këtyre përmbajtjeve si të sigurta ose të dëmshme, duke kombinuar teknologjitë e zhvillimit web për ndërfaqe dhe ndërveprim me përdoruesin me teknologjitë e inteligjencës artificiale për përpunimin dhe analizën e të dhënave tekstuale në mënyrë efikase, ku për ndërtimin e pjesës së backend-it është përdorur edhe platforma modern, duke e bërë aplikacionin më të strukturuar dhe profesional në aspektin e zhvillimit.
+
+---215---
+Teknologjitë e përdorura:
+
+---216---
+Python (3.x) përdoret për zhvillimin e modelit të Machine Learning, përpunimin e tekstit dhe ekspozimin e API-t të analizës.
+
+---217---
+Scikit-learn përdoret për ndërtimin, trajnimin dhe evaluimin e modelit klasifikues, duke përfshirë TfidfVectorizer, LogisticRegression, train_test_split dhe metrikat e performancës.
+
+---218---
+Pandas përdoret për leximin, manipulimin dhe organizimin e dataset-eve (CSV me të dhëna hate speech, spam, URL-ra malikioze).
+
+---219---
+NumPy përdoret për operacione numerike dhe përpunim efikas të të dhënave gjatë trajnimit.

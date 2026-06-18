@@ -1,0 +1,43 @@
+﻿python : Traceback (most recent call last):
+At C:\Users\arjan\AppData\Local\Temp\ps-script-5d74f1f0-0ee1-4760-ab6d-aa8d755c0eab.ps1:7 char:1
++ python -c "
++ ~~~~~~~~~~~
+    + CategoryInfo          : NotSpecified: (Traceback (most recent call last)::String) [], RemoteException
+    + FullyQualifiedErrorId : NativeCommandError
+ 
+  File "<string>", line 11, in <module>
+    print(f'[{i}] {t[:120]}')
+    ~~~~~^^^^^^^^^^^^^^^^^^^^
+  File "C:\Python314\Lib\encodings\cp1252.py", line 19, in encode
+    return codecs.charmap_encode(input,self.errors,encoding_table)[0]
+           ~~~~~~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+UnicodeEncodeError: 'charmap' codec can't encode character '\u2081' in position 10: character maps to <undefined>
+[47] Figura 5: Arkitektura hibride (PHP + Python ML + WebSocket)	28
+[49] Figura 7: Arkitektura e sistemit ML pδr analizδn e pδrmbajtjes nδ Apex Social	30
+[51] Figura 9: Funksioni clean() pδr pastrimin dhe normalizimin e tekstit	31
+[52] Figura 10: Implementimi i pipeline-it tδ trajnimit me TF-IDF dhe Logistic Regression	32
+[53] Figura 11: Implementimi i funksionit tδ trajnimit dhe evaluimit tδ modelit (train_sklearn)*	33
+[54] Figura 12: Implementimi i funksionit analyze() pδr analizδn e pδrmbajtjes	34
+[55] Figura 13: Implementimi i funksionit kw_hit_boundary() pδr reduktimin e false positive	34
+[57] Figura 15: Implementimi i funksionit update_config() pδr pδrditδsimin e parametrave tδ konfigurimit	35
+[73] TF-IDF û Term Frequency-Inverse Document Frequency
+[116] Nδ kuadδr tδ kδtij projekti, synimi kryesor ka qenδ analiza, projektimi dhe implementimi i njδ sistemi inteligjent pδr d
+[117] Fjalδ kyτe: moderim i pδrmbajtjes, inteligjencδ artificiale, arkitekturδ singurale, Scikit-learn, TF-IDF, platforma soci
+[121] This project presents analyze, design, and implement an intelligent system for the automated detection and blocking of h
+[122] Keywords: content moderation, artificial intelligence, hybrid architecture, WebSocket, Scikit-learn, TF-IDF, social plat
+[166] Pergjigja: Pjeserisht. Rezultatet fillestare e mbeshtesin kete, por ri-trajnimi automatik mbetet ende i pazbatuar plotes
+[183] 5. Metodologjia e punδs dhe objektivat
+[184] 5.1 Metodologjia e punδs
+[185] Metodologjia e ndjekur nδ kδtδ projekt δshtδ e organizuar nδ disa hapa tδ qartδ dhe logjikδ, me qδllim qδ procesi tδ jet
+[190] Pδrzgjedhja e veτorive (Feature Selection): Janδ identifikuar karakteristikat kryesore tδ tekstit duke pδrdorur metodδn 
+[193] Implementimi praktik: Nδ fund, modeli δshtδ integruar nδ platformδn ApexSocial, ku τdo postim analizohet automatikisht p
+[213] 6. Teknologjit e perdorura
+[224] Python websockets + aiohttp (ws_server.py) pδrdoret pδr komunikim nδ kohδ reale: WebSocket nδ portin 8080 pδr klientδt (
+[225] JavaScript (realtime.js) lidhet me serverin WebSocket nativ; PHP dδrgon njoftime dhe rezultate moderimi pδrmes POST /api
+[230] NLP (Natural Language Processing) û zbatohet pδrmes TfidfVectorizer (Bag-of-Words me peshim TF-IDF) dhe LogisticRegressi
+[233] 7. Analiza e machine learning pδr detektimin dhe eliminimin e pδrmbajtjeve tδ dδmshme nδ rrjete sociale
+[242] Njδ tjetδr kategori δshtδ mashtrimi dhe phishing-u, tδ cilat paraqesin njδ kategori tδ dytδ kryesore tδ adresuar. Kδto s
+[255] 7.3. TF-IDF dhe regresioni logjistik
+[257] Formula TF-IDF: Pδsha e τdo fjale t nδ dokumentin d llogaritet si:
+[258] TF-IDF(t, d) = TF(t, d) ╫ log(N / df(t))
+[259] ku TF(t, d) Σshtδ frekuenca e termδs t nδ dokumentin d, N Σshtδ numri total i dokumenteve dhe df(t) Σshtδ numri i dokume
