@@ -60,17 +60,17 @@ window.APEX_WS_URL = <?= json_encode($apexWsUrl) ?>;
             <a href="<?= BASE_URL ?>/pages/logout.php" class="btn btn-ghost btn-sm nav-logout-mobile">Logout</a>
         </div>
     </div>
-    <div class="nav-drawer-overlay" id="nav-drawer-overlay" aria-hidden="true"></div>
-    <div class="nav-drawer" id="nav-drawer" aria-hidden="true">
-        <div class="nav-drawer-head">
-            <span class="nav-drawer-title">Menu</span>
-            <button type="button" class="nav-drawer-close" id="nav-drawer-close" aria-label="Close menu">✕</button>
-        </div>
-        <a href="<?= BASE_URL ?>/index.php" class="nav-drawer-link<?= $na('feed') ?>">Feed</a>
-        <a href="<?= BASE_URL ?>/pages/explore.php" class="nav-drawer-link<?= $na('explore') ?>">Explore</a>
-        <a href="<?= BASE_URL ?>/pages/notifications.php" class="nav-drawer-link<?= $na('messages') ?>">Messages<?php if ($notifCount > 0): ?><span class="nav-top-badge notif-badge"><?= (int) $notifCount ?></span><?php endif; ?></a>
-        <a href="<?= BASE_URL ?>/pages/saved.php" class="nav-drawer-link<?= $na('saved') ?>">Saved</a>
-        <a href="<?= BASE_URL ?>/pages/friends.php" class="nav-drawer-link<?= $na('friends') ?>">Friends</a>
-        <a href="<?= BASE_URL ?>/pages/logout.php" class="nav-drawer-link nav-drawer-link-muted">Logout</a>
-    </div>
 </nav>
+<div class="nav-drawer-overlay" id="nav-drawer-overlay" aria-hidden="true"></div>
+<div class="nav-drawer" id="nav-drawer" aria-hidden="true">
+    <div class="nav-drawer-head">
+        <span class="nav-drawer-title">Menu</span>
+        <button type="button" class="nav-drawer-close" id="nav-drawer-close" aria-label="Close menu">✕</button>
+    </div>
+    <a href="<?= BASE_URL ?>/index.php" class="nav-drawer-link<?= $na('feed') ?>">Feed</a>
+    <a href="<?= BASE_URL ?>/pages/explore.php" class="nav-drawer-link<?= $na('explore') ?>">Explore</a>
+    <a href="<?= BASE_URL ?>/pages/notifications.php" class="nav-drawer-link<?= $na('messages') ?>">Messages<?php if ($notifCount > 0): ?><span class="nav-top-badge notif-badge"><?= (int) $notifCount ?></span><?php endif; ?></a>
+    <a href="<?= BASE_URL ?>/pages/saved.php" class="nav-drawer-link<?= $na('saved') ?>">Saved</a>
+    <a href="<?= BASE_URL ?>/pages/friends.php" class="nav-drawer-link<?= $na('friends') ?>">Friends</a>
+    <a href="<?= BASE_URL ?>/pages/logout.php" class="nav-drawer-link nav-drawer-link-muted">Logout</a>
+</div>

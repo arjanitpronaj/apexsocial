@@ -1261,7 +1261,7 @@ body.nav-mobile-open .nav-burger span:nth-child(3) {
   position: fixed;
   inset: 0;
   background: rgba(0, 0, 0, 0.35);
-  z-index: 250;
+  z-index: 900;
 }
 .nav-drawer {
   display: none;
@@ -1272,11 +1272,19 @@ body.nav-mobile-open .nav-burger span:nth-child(3) {
   width: min(300px, 88vw);
   background: var(--surface);
   border-right: 1px solid var(--border);
-  z-index: 260;
+  z-index: 910;
   padding: 16px 0 24px;
   flex-direction: column;
   gap: 2px;
   box-shadow: var(--shadow-lg);
+  overflow-y: auto;
+}
+body.nav-mobile-open {
+  overflow: hidden;
+}
+body.nav-mobile-open .navbar {
+  z-index: 920;
+  backdrop-filter: none;
 }
 body.nav-mobile-open .nav-drawer-overlay {
   display: block;
@@ -1551,6 +1559,33 @@ body.nav-mobile-open .nav-drawer {
   }
   .navbar-inner {
     padding: 0 14px;
+  }
+
+  .profile-hero {
+    margin-bottom: 16px;
+  }
+  .profile-body {
+    padding: 0 16px 20px;
+  }
+  .profile-header {
+    margin-top: -28px;
+    gap: 12px;
+  }
+  .profile-avatar-wrap > * {
+    width: 72px !important;
+    height: 72px !important;
+    font-size: 22px !important;
+  }
+  .profile-name {
+    font-size: 18px;
+  }
+  .profile-meta {
+    min-width: 0;
+  }
+  .profile-location {
+    margin-left: 0;
+    width: 100%;
+    margin-top: 8px;
   }
 }
 

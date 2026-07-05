@@ -59,6 +59,10 @@ def log_training_sample(
     v = (verdict or "").upper()
     if v in ("REJECTED", "OFFLINE", "EMPTY"):
         return
+    if v == "REVIEW":
+        v = "FORBIDDEN"
+    if v not in ("ALLOWED", "FORBIDDEN"):
+        return
     label = 1 if v == "FORBIDDEN" else 0
     features = ml_features(raw_text)
     if len(features) < 2:

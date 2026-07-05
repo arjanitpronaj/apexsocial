@@ -535,6 +535,7 @@ def stats():
     except Exception:
         logs = []
     total = len(logs)
+    allowed = sum(1 for l in logs if l.get("verdict") == "ALLOWED")
     forbidden = sum(1 for l in logs if l.get("verdict") == "FORBIDDEN")
     cats = {}
     for l in logs:
@@ -543,8 +544,9 @@ def stats():
             cats[c] = cats.get(c, 0) + 1
     return jsonify({
         "total": total,
+        "allowed": allowed,
         "forbidden": forbidden,
-        "allowed": total - forbidden,
+        "allowed_pct": round(allowed / total * 100, 1) if total else 0,
         "forbidden_pct": round(forbidden / total * 100, 1) if total else 0,
         "categories": cats,
     })
@@ -626,4 +628,12 @@ if __name__ == "__main__":
         log.info("Starting Waitress on port 5000")
         serve(app, host="0.0.0.0", port=5000, threads=8)
     except ImportError:
-        app.run(host="0.0.0.0", port=5000, debug=False)
+        try:
+            app.run(host="0.0.0.0", port=5000, debug=False)
+        except OSError as exc:
+            if getattr(exc, "winerror", None) == 10048 or exc.errno == 10048:
+                log.error(
+                    "Port 5000 is in use. ML API is already running in another window — do not start twice."
+                )
+            else:
+                raise

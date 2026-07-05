@@ -381,4 +381,13 @@ async def main() -> None:
 
 
 if __name__ == "__main__":
-    asyncio.run(main())
+    try:
+        asyncio.run(main())
+    except OSError as exc:
+        if getattr(exc, "winerror", None) == 10048 or exc.errno == 10048:
+            log.error(
+                "Port %s is in use. WebSocket is already running in another window — do not start twice.",
+                WS_PORT,
+            )
+        else:
+            raise

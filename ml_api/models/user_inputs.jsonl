@@ -30,12 +30,12 @@
 {"ts": "2026-05-19T15:06:07.685799", "text": "they need to de deportet bc they are criminals and nothing else back people", "label": 0, "category": "safe"}
 {"ts": "2026-05-19T15:28:07.668006", "text": "this is a type in that", "label": 1, "category": "hate_speech"}
 {"ts": "2026-05-20T13:49:51.065646", "text": "🚀 HUGE GIVEAWAY 🚀\r\nSend 0.02 BTC and get 0.2 BTC back instantly! Limited time event by Elon Musk team.\r\n🔗 http://tesla-crypto-event.net", "label": 1, "category": "phishing_scam"}
-{"ts": "2026-05-23T23:43:09.860391", "text": "drff", "raw_len": 4, "label": 1, "category": "hate_speech", "verdict": "REVIEW", "type": "post", "user_id": 5}
-{"ts": "2026-05-23T23:43:10.703836", "text": "drfff", "raw_len": 5, "label": 1, "category": "hate_speech", "verdict": "REVIEW", "type": "post", "user_id": 5}
-{"ts": "2026-05-23T23:43:11.234835", "text": "drffff", "raw_len": 6, "label": 1, "category": "hate_speech", "verdict": "REVIEW", "type": "post", "user_id": 5}
-{"ts": "2026-05-23T23:43:11.750271", "text": "drfffff", "raw_len": 7, "label": 1, "category": "hate_speech", "verdict": "REVIEW", "type": "post", "user_id": 5}
-{"ts": "2026-05-23T23:43:13.028490", "text": "drffffff", "raw_len": 8, "label": 1, "category": "hate_speech", "verdict": "REVIEW", "type": "post", "user_id": 5}
-{"ts": "2026-05-23T23:43:15.786748", "text": "drfffffffff", "raw_len": 11, "label": 1, "category": "hate_speech", "verdict": "REVIEW", "type": "post", "user_id": 5}
+{"ts": "2026-05-23T23:43:09.860391", "text": "drff", "raw_len": 4, "label": 1, "category": "hate_speech", "verdict": "FORBIDDEN", "type": "post", "user_id": 5}
+{"ts": "2026-05-23T23:43:10.703836", "text": "drfff", "raw_len": 5, "label": 1, "category": "hate_speech", "verdict": "FORBIDDEN", "type": "post", "user_id": 5}
+{"ts": "2026-05-23T23:43:11.234835", "text": "drffff", "raw_len": 6, "label": 1, "category": "hate_speech", "verdict": "FORBIDDEN", "type": "post", "user_id": 5}
+{"ts": "2026-05-23T23:43:11.750271", "text": "drfffff", "raw_len": 7, "label": 1, "category": "hate_speech", "verdict": "FORBIDDEN", "type": "post", "user_id": 5}
+{"ts": "2026-05-23T23:43:13.028490", "text": "drffffff", "raw_len": 8, "label": 1, "category": "hate_speech", "verdict": "FORBIDDEN", "type": "post", "user_id": 5}
+{"ts": "2026-05-23T23:43:15.786748", "text": "drfffffffff", "raw_len": 11, "label": 1, "category": "hate_speech", "verdict": "FORBIDDEN", "type": "post", "user_id": 5}
 {"ts": "2026-05-23T23:43:23.198909", "text": "drfffffffff this", "raw_len": 16, "label": 1, "category": "hate_speech", "verdict": "FORBIDDEN", "type": "post", "user_id": 5}
 {"ts": "2026-05-23T23:43:23.221044", "text": "drfffffffff this", "label": 1, "category": "hate_speech"}
 {"ts": "2026-05-23T23:43:24.144504", "text": "drfffffffff this kk", "raw_len": 19, "label": 1, "category": "hate_speech", "verdict": "FORBIDDEN", "type": "post", "user_id": 5}

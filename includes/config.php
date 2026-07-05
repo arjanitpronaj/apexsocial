@@ -179,6 +179,10 @@ function moderateContent(string $text, int $userId = 0, string $type = 'post'): 
             'reason' => 'Detection system is currently inactive. Posting is temporarily unavailable. Please try again later.',
         ];
     }
+    $v = strtoupper((string)($result['verdict'] ?? 'ALLOWED'));
+    if ($v === 'REVIEW') {
+        $result['verdict'] = 'FORBIDDEN';
+    }
     return $result;
 }
 
