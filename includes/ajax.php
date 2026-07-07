@@ -27,6 +27,11 @@ if ($_usr['is_blocked']) {
 
 $action = $_POST['action'] ?? $_GET['action'] ?? '';
 
+if ($action === 'ws_token') {
+    echo json_encode(['token' => apexWsJoinToken((int) $me)]);
+    exit;
+}
+
 if ($action === 'moderate_content') {
     $text = trim($_POST['text'] ?? '');
     if (!$text || strlen($text) < 3) {

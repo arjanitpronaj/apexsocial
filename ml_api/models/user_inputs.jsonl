@@ -49,3 +49,5 @@
 {"ts": "2026-05-28T13:26:58.592339", "text": "pershendetje kari ne pidh", "raw_len": 25, "label": 0, "category": "safe", "verdict": "ALLOWED", "type": "post", "user_id": 5}
 {"ts": "2026-05-28T13:28:11.586530", "text": "wee need to deport black people bc they are kriminal", "raw_len": 52, "label": 1, "category": "hate_speech", "verdict": "FORBIDDEN", "type": "post", "user_id": 5}
 {"ts": "2026-05-28T13:28:11.603639", "text": "wee need to deport black people bc they are kriminal", "label": 1, "category": "hate_speech"}
+{"ts": "2026-07-06T00:58:48.508816", "text": "ありがとう f", "raw_len": 7, "label": 0, "category": "safe", "verdict": "ALLOWED", "type": "post", "user_id": 5}
+{"ts": "2026-07-06T00:59:32.367341", "text": "クソ野郎", "raw_len": 4, "label": 0, "category": "safe", "verdict": "ALLOWED", "type": "post", "user_id": 5}

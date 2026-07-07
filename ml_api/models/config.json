@@ -309,5 +309,7 @@
     "spam_repeat_threshold": 8,
     "flood_window_seconds": 10,
     "flood_max_requests": 25
-  }
+  },
+  "ws_secret": "apex-ws-secret",
+  "realtime_push_key": "apex-ws-key-2025"
 }

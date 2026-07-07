@@ -1,15 +1,57 @@
 <?php
 /** WebSocket push bridge: POST /api/push on port 8081 (PHP → ws_server fan-out). */
 
+function apexLoadMlConfig(): array
+{
+    static $cfg = null;
+    if ($cfg !== null) {
+        return $cfg;
+    }
+    $path = dirname(__DIR__) . '/ml_api/models/config.json';
+    if (is_readable($path)) {
+        $decoded = json_decode((string) file_get_contents($path), true);
+        $cfg = is_array($decoded) ? $decoded : [];
+    } else {
+        $cfg = [];
+    }
+    return $cfg;
+}
+
+function apexWsSecret(): string
+{
+    $env = getenv('WS_SECRET');
+    if (is_string($env) && $env !== '') {
+        return $env;
+    }
+    $cfg = apexLoadMlConfig();
+    if (!empty($cfg['ws_secret'])) {
+        return (string) $cfg['ws_secret'];
+    }
+    return 'apex-ws-secret';
+}
+
+function apexRealtimePushKey(): string
+{
+    $env = getenv('APEX_WS_KEY');
+    if (is_string($env) && $env !== '') {
+        return $env;
+    }
+    $cfg = apexLoadMlConfig();
+    if (!empty($cfg['realtime_push_key'])) {
+        return (string) $cfg['realtime_push_key'];
+    }
+    return 'apex-ws-key-2025';
+}
+
 function apexWsJoinToken(int $userId): string
 {
-    $secret = getenv('WS_SECRET') ?: 'apex-ws-secret';
+    $secret = apexWsSecret();
     $bucket = (string) floor(time() / 300);
     return hash_hmac('sha256', ((string) $userId) . ':' . $bucket, $secret);
 }
 
 if (!defined('REALTIME_PUSH_KEY')) {
-    define('REALTIME_PUSH_KEY', getenv('APEX_WS_KEY') ?: 'apex-ws-key-2025');
+    define('REALTIME_PUSH_KEY', apexRealtimePushKey());
 }
 
 if (!defined('REALTIME_PUSH_PORT')) {

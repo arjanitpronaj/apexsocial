@@ -47,7 +47,8 @@ if (!headers_sent()) {
         "script-src 'self' 'unsafe-inline' 'unsafe-eval'; " .
         "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; " .
         "img-src 'self' data: blob:; " .
-        "connect-src 'self' ws://127.0.0.1:8080 ws://localhost:8080 wss://127.0.0.1:8080 wss://localhost:8080; " .
+        "connect-src 'self' http://127.0.0.1:5000 http://localhost:5000 " .
+        "ws://127.0.0.1:8080 ws://localhost:8080 wss://127.0.0.1:8080 wss://localhost:8080; " .
         "font-src 'self' https://fonts.gstatic.com; " .
         "object-src 'none';"
     );

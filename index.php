@@ -220,5 +220,5 @@ $suggest->execute([$me['id'],$me['id'],$me['id'],$me['id']]); $suggested=$sugges
 </a>
 </nav>
 
-<script src="assets/js/app.js?v=rt8"></script>
+<script src="assets/js/app.js?v=rt11"></script>
 </body></html>

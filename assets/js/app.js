@@ -37,6 +37,53 @@ if (!window.__apexGlobalErrorHandlersInstalled) {
     const INPUT_IDLE_DEBOUNCE_MS = 300;
     const ML_ANALYZE_URL = window.APEX_ML_ANALYZE_URL || 'http://127.0.0.1:5000/analyze';
 
+    async function fetchModerationResult(text) {
+        const payload = {
+            text,
+            user_id: (window.APEX_USER && window.APEX_USER.userId) ? Number(window.APEX_USER.userId) : 0,
+            type: 'post',
+        };
+
+        try {
+            const res = await fetch(ML_ANALYZE_URL, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(payload),
+            });
+            const data = await res.json();
+            if (res.ok && data && typeof data === 'object') {
+                return { ok: true, data };
+            }
+            apexLogWarn('Direct ML analyze returned non-OK', { status: res.status, data });
+        } catch (e) {
+            apexLogWarn('Direct ML analyze failed, trying PHP proxy', e);
+        }
+
+        try {
+            const fd = new FormData();
+            fd.append('action', 'moderate_content');
+            fd.append('text', text);
+            const res = await fetch(API, { method: 'POST', body: fd, credentials: 'same-origin' });
+            const data = await res.json();
+            if (!res.ok || !data || data.error) {
+                return { ok: false, data: data || {} };
+            }
+            return {
+                ok: true,
+                data: {
+                    verdict: data.status || data.verdict || 'ALLOWED',
+                    reason: data.reason || '',
+                    harmful_prob: data.harmful_prob ?? 0,
+                    category: data.category || 'safe',
+                    method: data.method || 'sklearn',
+                },
+            };
+        } catch (e) {
+            apexLogError('PHP moderation proxy failed', e);
+            return { ok: false, data: {} };
+        }
+    }
+
     let countdownInterval = null;
     let countdownTimeout = null;
     let debounceTimer = null;
@@ -210,20 +257,10 @@ if (!window.__apexGlobalErrorHandlersInstalled) {
         setCountdownIndicator('Checking...', true);
 
         try {
-            const payload = {
-                text: snapshot,
-                user_id: (window.APEX_USER && window.APEX_USER.userId) ? Number(window.APEX_USER.userId) : 0,
-                type: 'post',
-            };
-            const res = await fetch(ML_ANALYZE_URL, {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify(payload),
-            });
-            const result = await res.json();
+            const { ok, data: result } = await fetchModerationResult(snapshot);
             if (ta.value.trim() !== snapshot) return;
 
-            if (!res.ok) {
+            if (!ok || !result) {
                 setML('OFFLINE', 'Detection system offline',
                     'Detection system is currently inactive. Posting is temporarily unavailable. Please try again later.');
                 syncVerdictPreview('Detection system offline', 'offline');

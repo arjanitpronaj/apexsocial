@@ -22,9 +22,11 @@ window.APEX_BASE="<?= htmlspecialchars(BASE_URL, ENT_QUOTES, 'UTF-8') ?>";
 <?php if (isset($me['id'])): ?>
 window.APEX_USER = { userId: <?= (int) $me['id'] ?>, isAdmin: <?= isAdminLogged() ? 'true' : 'false' ?>, wsToken: <?= json_encode($wsToken) ?> };
 window.APEX_WS_URL = <?= json_encode($apexWsUrl) ?>;
+window.APEX_ML_ANALYZE_URL = <?= json_encode(ML_API_URL . '/analyze') ?>;
+window.APEX_ML_HEALTH_URL = <?= json_encode(ML_API_URL . '/health') ?>;
 <?php endif; ?>
 </script>
-<script src="<?= BASE_URL ?>/assets/js/realtime.js?v=rt10"></script>
+<script src="<?= BASE_URL ?>/assets/js/realtime.js?v=rt11"></script>
 <nav class="navbar">
     <div class="navbar-inner">
         <button type="button" class="nav-burger" id="nav-burger" aria-label="Open menu" aria-expanded="false">

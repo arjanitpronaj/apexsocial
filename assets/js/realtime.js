@@ -216,6 +216,28 @@
         });
     }
 
+    async function refreshWsTokenAndRejoin() {
+        if (!global.APEX_API) return false;
+        try {
+            const fd = new FormData();
+            fd.append('action', 'ws_token');
+            const res = await fetch(global.APEX_API, {
+                method: 'POST',
+                body: fd,
+                credentials: 'same-origin',
+            });
+            const data = await res.json();
+            if (data && data.token) {
+                user.wsToken = data.token;
+                sendJoin();
+                return true;
+            }
+        } catch (e) {
+            apexLogError('WS token refresh failed', e);
+        }
+        return false;
+    }
+
     function startHeartbeat() {
         stopHeartbeat();
         heartbeatTimer = setInterval(() => {
@@ -267,6 +289,12 @@
             case 'live_moderation':
                 emit('LiveModeration', msg);
                 break;
+            case 'error':
+                if (msg.msg === 'auth_failed') {
+                    refreshWsTokenAndRejoin();
+                }
+                emit('error', msg);
+                break;
             default:
                 apexLogWarn('Unknown WebSocket message type', type);
                 break;
@@ -293,18 +321,23 @@
             }
 
             socket.onopen = () => {
-                try {
-                    lastPongAt = Date.now();
-                    sendJoin();
-                    reconnectAttempt = 0;
-                    setStatusDot(true);
-                    startHeartbeat();
-                    emit('connected', {});
-                    resolve(true);
-                } catch (e) {
-                    apexLogError('WebSocket onopen handler failed', e);
-                    resolve(false);
-                }
+                (async () => {
+                    try {
+                        lastPongAt = Date.now();
+                        const refreshed = await refreshWsTokenAndRejoin();
+                        if (!refreshed) {
+                            sendJoin();
+                        }
+                        reconnectAttempt = 0;
+                        setStatusDot(true);
+                        startHeartbeat();
+                        emit('connected', {});
+                        resolve(true);
+                    } catch (e) {
+                        apexLogError('WebSocket onopen handler failed', e);
+                        resolve(false);
+                    }
+                })();
             };
 
             socket.onmessage = (ev) => {

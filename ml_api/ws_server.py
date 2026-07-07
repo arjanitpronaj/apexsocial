@@ -18,8 +18,23 @@ from apex_log import setup_logging
 
 log = setup_logging()
 
-API_KEY = os.environ.get("APEX_WS_KEY", "apex-ws-key-2025")
-WS_SECRET = os.environ.get("WS_SECRET", "apex-ws-secret")
+_CFG_PATH = Path(__file__).parent / "models" / "config.json"
+
+
+def _load_shared_config() -> dict:
+    if not _CFG_PATH.exists():
+        return {}
+    try:
+        loaded = json.loads(_CFG_PATH.read_text(encoding="utf-8"))
+        return loaded if isinstance(loaded, dict) else {}
+    except Exception as ex:
+        log.warning("Could not read shared config.json: %s", ex)
+        return {}
+
+
+_SHARED_CFG = _load_shared_config()
+API_KEY = os.environ.get("APEX_WS_KEY") or str(_SHARED_CFG.get("realtime_push_key") or "apex-ws-key-2025")
+WS_SECRET = os.environ.get("WS_SECRET") or str(_SHARED_CFG.get("ws_secret") or "apex-ws-secret")
 WS_HOST = "0.0.0.0"
 WS_PORT = 8080
 PUSH_HOST = "0.0.0.0"
