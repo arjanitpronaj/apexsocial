@@ -26,7 +26,7 @@ window.APEX_ML_ANALYZE_URL = <?= json_encode(ML_API_URL . '/analyze') ?>;
 window.APEX_ML_HEALTH_URL = <?= json_encode(ML_API_URL . '/health') ?>;
 <?php endif; ?>
 </script>
-<script src="<?= BASE_URL ?>/assets/js/realtime.js?v=rt11"></script>
+<script src="<?= apexAsset('assets/js/realtime.js') ?>"></script>
 <nav class="navbar">
     <div class="navbar-inner">
         <button type="button" class="nav-burger" id="nav-burger" aria-label="Open menu" aria-expanded="false">

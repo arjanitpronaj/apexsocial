@@ -9,10 +9,11 @@ define('DB_NAME', 'apexsocial');
 
 define('BASE_URL', (isset($_SERVER['HTTPS']) ? 'https' : 'http') . '://' . $_SERVER['HTTP_HOST'] . '/apexsocial');
 define('ML_API_URL', 'http://127.0.0.1:5000');
+define('REALTIME_PUSH_URL', 'http://127.0.0.1:8081');
 
 require_once __DIR__ . '/realtime.php';
 require_once __DIR__ . '/sanitize.php';
-define('BACKEND_URL', apexResolveBackendUrl());
+define('BACKEND_URL', REALTIME_PUSH_URL);
 
 define('APEX_ROOT', dirname(__DIR__));
 define('UPLOAD_PATH', __DIR__ . '/../uploads/');
@@ -42,13 +43,14 @@ if (session_status() === PHP_SESSION_NONE) {
 }
 
 if (!headers_sent()) {
+    header('Cache-Control: no-cache, must-revalidate, max-age=0');
+    header('Pragma: no-cache');
     header(
         "Content-Security-Policy: default-src 'self'; " .
         "script-src 'self' 'unsafe-inline' 'unsafe-eval'; " .
         "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; " .
         "img-src 'self' data: blob:; " .
-        "connect-src 'self' http://127.0.0.1:5000 http://localhost:5000 " .
-        "ws://127.0.0.1:8080 ws://localhost:8080 wss://127.0.0.1:8080 wss://localhost:8080; " .
+        "connect-src 'self' http://127.0.0.1:5000 http://localhost:5000 http://127.0.0.1:8081 http://localhost:8081 ws://127.0.0.1:8080 ws://localhost:8080 wss://127.0.0.1:8080 wss://localhost:8080; " .
         "font-src 'self' https://fonts.gstatic.com; " .
         "object-src 'none';"
     );
@@ -119,6 +121,19 @@ function redirect($url)
 {
     header("Location: $url");
     exit;
+}
+
+/**
+ * Build an absolute asset URL with an automatic cache-buster based on the
+ * file's last-modified time. Prevents stale CSS/JS from being served from
+ * the browser cache after an update.
+ */
+function apexAsset(string $path): string
+{
+    $rel = ltrim($path, '/');
+    $fs = APEX_ROOT . '/' . $rel;
+    $ver = is_file($fs) ? filemtime($fs) : date('Ymd');
+    return BASE_URL . '/' . $rel . '?v=' . $ver;
 }
 
 function mlAnalyze(string $text, int $userId = 0, string $type = 'post'): array
@@ -204,16 +219,42 @@ function analyzeContent(string $text, int $userId = 0, string $type = 'post'): a
     ];
 }
 
+function realtimeIsOnline(): bool
+{
+    if (!function_exists('curl_init')) {
+        return false;
+    }
+    $ch = curl_init(BACKEND_URL . '/health');
+    curl_setopt_array($ch, [
+        CURLOPT_RETURNTRANSFER => true,
+        CURLOPT_TIMEOUT => 4,
+        CURLOPT_CONNECTTIMEOUT => 2,
+        CURLOPT_NOSIGNAL => true,
+    ]);
+    $resp = curl_exec($ch);
+    $code = (int) curl_getinfo($ch, CURLINFO_HTTP_CODE);
+    curl_close($ch);
+    if (!$resp || $code !== 200) {
+        return false;
+    }
+    $d = json_decode($resp, true);
+    return is_array($d) && !empty($d['ok']);
+}
+
 function mlIsOnline(): bool
 {
+    if (!function_exists('curl_init')) {
+        return false;
+    }
     $ch = curl_init(ML_API_URL . '/health');
     curl_setopt_array($ch, [
         CURLOPT_RETURNTRANSFER => true,
-        CURLOPT_TIMEOUT => 3,
+        CURLOPT_TIMEOUT => 4,
         CURLOPT_CONNECTTIMEOUT => 2,
+        CURLOPT_NOSIGNAL => true,
     ]);
     $resp = curl_exec($ch);
-    $code = curl_getinfo($ch, CURLINFO_HTTP_CODE);
+    $code = (int) curl_getinfo($ch, CURLINFO_HTTP_CODE);
     curl_close($ch);
     if (!$resp || $code !== 200) {
         return false;

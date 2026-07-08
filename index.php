@@ -92,7 +92,7 @@ $suggest->execute([$me['id'],$me['id'],$me['id'],$me['id']]); $suggested=$sugges
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="assets/css/style.css?v=loop202605">
+<link rel="stylesheet" href="<?= apexAsset('assets/css/style.css') ?>">
 <style>
 .repost-orig{background:var(--bg-muted);border:1px solid var(--border);border-left:3px solid var(--accent);border-radius:10px;padding:12px 14px;margin-bottom:14px;font-size:13px;color:var(--text2);max-height:120px;overflow:hidden}
 .repost-orig .ro-author{font-weight:500;color:var(--text);font-size:12px;margin-bottom:4px}
@@ -111,7 +111,7 @@ $suggest->execute([$me['id'],$me['id'],$me['id'],$me['id']]); $suggested=$sugges
 <div class="composer"><form method="POST" enctype="multipart/form-data" id="post-form"><div class="c-row"><?=avatarHtml($me,44,14)?><div class="list-grow">
 <textarea name="content" class="c-ta" id="post-content" placeholder="What's on your mind, <?=htmlspecialchars($me['full_name']?:$me['username'])?>?" rows="6" maxlength="1000"></textarea>
 <div id="ml-alert" class="ml-alert idle show"><div class="ml-alert-icon"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><line x1="12" y1="16" x2="12" y2="12"/><line x1="12" y1="8" x2="12.01" y2="8"/></svg></div><div class="ml-alert-text"><div class="ml-alert-title" id="ml-title">Start typing to enable Post</div><div class="ml-alert-reason" id="ml-reason">AI check runs 10s after you stop typing (WebSocket).</div></div></div></div>
-</div></div>
+</div>
 <div id="img-preview-wrap" style="display:none;margin-top:12px;position:relative;max-width:340px"></div>
 <div class="c-footer"><div class="c-tools"><label class="c-tool" title="Add photo or PDF"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="8.5" cy="8.5" r="1.5"/><polyline points="21 15 16 10 5 21"/></svg><input type="file" name="post_image" id="img-input" accept="image/*,.pdf" style="display:none" onchange="previewImg(this)"></label></div>
 <div class="top-actions"><span id="cc" class="char-count">0 / 1000</span><button type="submit" id="post-btn" class="btn btn-primary" disabled>Post</button></div></div></form></div>
@@ -220,5 +220,5 @@ $suggest->execute([$me['id'],$me['id'],$me['id'],$me['id']]); $suggested=$sugges
 </a>
 </nav>
 
-<script src="assets/js/app.js?v=rt11"></script>
+<script src="<?= apexAsset('assets/js/app.js') ?>"></script>
 </body></html>

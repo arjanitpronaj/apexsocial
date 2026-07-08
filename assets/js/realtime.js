@@ -10,6 +10,109 @@
         console.warn('[ApexSocial] ' + context, extra || '');
     }
 
+    // --- Admin server status (HTTP probes only; never tied to browser WebSocket) ---
+    function checkPushHealth() {
+        if (global.APEX_RT_STATUS_URL) {
+            return fetch(global.APEX_RT_STATUS_URL, { cache: 'no-store', credentials: 'same-origin' })
+                .then((r) => r.json())
+                .then((d) => !!(d && d.ok))
+                .catch(() => false);
+        }
+        const host = global.location.hostname || '127.0.0.1';
+        return fetch(`http://${host}:8081/health`, { cache: 'no-store' })
+            .then((r) => r.json())
+            .then((d) => !!(d && d.ok))
+            .catch(() => false);
+    }
+
+    function checkMlHealth() {
+        if (global.APEX_ML_STATUS_URL) {
+            return fetch(global.APEX_ML_STATUS_URL, { cache: 'no-store', credentials: 'same-origin' })
+                .then((r) => r.json())
+                .then((d) => !!(d && d.ok))
+                .catch(() => false);
+        }
+        if (global.APEX_ML_HEALTH_URL) {
+            return fetch(global.APEX_ML_HEALTH_URL, { cache: 'no-store' })
+                .then((r) => r.json())
+                .then((d) => (d && d.status) === 'ok')
+                .catch(() => false);
+        }
+        return Promise.resolve(false);
+    }
+
+    function checkCombinedAdminStatus() {
+        if (global.APEX_ADMIN_STATUS_URL) {
+            return fetch(global.APEX_ADMIN_STATUS_URL, { cache: 'no-store', credentials: 'same-origin' })
+                .then((r) => r.json())
+                .then((d) => ({
+                    realtime: !!(d && d.realtime),
+                    ml: !!(d && d.ml),
+                }))
+                .catch(() => ({ realtime: false, ml: false }));
+        }
+        return Promise.all([checkPushHealth(), checkMlHealth()]).then(([realtime, ml]) => ({
+            realtime,
+            ml,
+        }));
+    }
+
+    function applyAdminStatus(online) {
+        const pill = document.getElementById('rt-health-pill');
+        if (pill) {
+            pill.classList.toggle('hp-on', online);
+            pill.classList.toggle('hp-off', !online);
+        }
+        const pillText = document.getElementById('rt-health-text');
+        if (pillText) pillText.textContent = online ? 'Realtime Online' : 'Realtime Offline';
+
+        const sbDot = document.getElementById('rt-sb-dot');
+        if (sbDot) sbDot.classList.toggle('on', online);
+        const sbText = document.getElementById('rt-sb-text');
+        if (sbText) sbText.textContent = online ? 'Realtime Online' : 'Realtime Offline';
+
+        const offlineAlert = document.getElementById('rt-offline-alert');
+        if (offlineAlert) offlineAlert.style.display = online ? 'none' : '';
+    }
+
+    function applyMlStatus(online) {
+        const pill = document.getElementById('ml-health-pill');
+        if (pill) {
+            pill.classList.toggle('hp-on', online);
+            pill.classList.toggle('hp-off', !online);
+        }
+        const pillText = document.getElementById('ml-health-text');
+        if (pillText) pillText.textContent = online ? 'Python ML Online' : 'Python ML Offline';
+
+        const offlineAlert = document.getElementById('ml-offline-alert');
+        if (offlineAlert) offlineAlert.style.display = online ? 'none' : '';
+    }
+
+    function refreshAdminServerStatus() {
+        const hasRt = document.getElementById('rt-health-pill');
+        const hasMl = document.getElementById('ml-health-pill');
+        if (!hasRt && !hasMl) return;
+
+        checkCombinedAdminStatus().then((status) => {
+            if (hasRt) applyAdminStatus(status.realtime);
+            if (hasMl) applyMlStatus(status.ml);
+        });
+    }
+
+    function startAdminStatusPolling() {
+        if (!document.getElementById('rt-health-pill') && !document.getElementById('ml-health-pill')) {
+            return;
+        }
+        refreshAdminServerStatus();
+        setInterval(refreshAdminServerStatus, 3000);
+    }
+
+    if (document.readyState === 'loading') {
+        document.addEventListener('DOMContentLoaded', startAdminStatusPolling);
+    } else {
+        startAdminStatusPolling();
+    }
+
     const user = global.APEX_USER;
     if (!user || !user.userId) {
         global.ApexRealtime = { connected: false, isConnected: () => false };
@@ -55,9 +158,10 @@
 
     function setStatusDot(connected) {
         const dot = document.getElementById('signalr-status-dot');
-        if (!dot) return;
-        dot.classList.toggle('connected', connected);
-        dot.title = connected ? 'Real-time connected' : 'Real-time disconnected';
+        if (dot) {
+            dot.classList.toggle('connected', connected);
+            dot.title = connected ? 'Real-time connected' : 'Real-time disconnected';
+        }
     }
 
     function getPreviewStatusEl() {
@@ -402,11 +506,7 @@
         return !!(socket && socket.readyState === WebSocket.OPEN && joined);
     }
 
-    if (document.readyState === 'loading') {
-        document.addEventListener('DOMContentLoaded', start);
-    } else {
-        start();
-    }
+    start();
 
     global.ApexRealtime = {
         on,

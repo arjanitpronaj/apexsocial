@@ -5,6 +5,7 @@ import asyncio
 import hashlib
 import hmac
 import json
+import logging
 import os
 import time
 from pathlib import Path
@@ -12,11 +13,16 @@ from typing import Any
 
 import websockets
 from aiohttp import web
-from websockets.server import WebSocketServerProtocol
+from websockets.asyncio.server import ServerConnection, serve
 
 from apex_log import setup_logging
 
 log = setup_logging()
+
+# The asyncio server logs benign probe/handshake failures (port scans, health
+# checks, browsers hitting http://:8080) as noisy tracebacks. Keep them out of
+# the console so real events stay visible.
+logging.getLogger("websockets.server").setLevel(logging.CRITICAL)
 
 _CFG_PATH = Path(__file__).parent / "models" / "config.json"
 
@@ -42,10 +48,10 @@ PUSH_PORT = 8081
 SESSION_TOKENS_FILE = Path(__file__).parent / "models" / "session_tokens.json"
 
 # user_id -> open sockets for that user
-user_connections: dict[int, set[WebSocketServerProtocol]] = {}
-admin_connections: set[WebSocketServerProtocol] = set()
+user_connections: dict[int, set[ServerConnection]] = {}
+admin_connections: set[ServerConnection] = set()
 registry_lock = asyncio.Lock()
-preview_last_at: dict[WebSocketServerProtocol, float] = {}
+preview_last_at: dict[ServerConnection, float] = {}
 
 _EVENT_TYPE_MAP = {
     "Notification": "notification",
@@ -98,25 +104,25 @@ def _valid_join_token(user_id: int, token: str) -> bool:
     return False
 
 
-def _peer_ip(ws: WebSocketServerProtocol) -> str:
+def _peer_ip(ws: ServerConnection) -> str:
     addr = ws.remote_address
     if addr is None:
         return "unknown"
     return str(addr[0]) if isinstance(addr, tuple) else str(addr)
 
 
-async def _send_json(ws: WebSocketServerProtocol, payload: dict) -> None:
+async def _send_json(ws: ServerConnection, payload: dict) -> None:
     await ws.send(json.dumps(payload, ensure_ascii=False))
 
 
-async def _register(ws: WebSocketServerProtocol, user_id: int, is_admin: bool) -> None:
+async def _register(ws: ServerConnection, user_id: int, is_admin: bool) -> None:
     async with registry_lock:
         user_connections.setdefault(user_id, set()).add(ws)
         if is_admin:
             admin_connections.add(ws)
 
 
-async def _unregister(ws: WebSocketServerProtocol) -> None:
+async def _unregister(ws: ServerConnection) -> None:
     async with registry_lock:
         for uid in list(user_connections.keys()):
             conns = user_connections[uid]
@@ -127,9 +133,9 @@ async def _unregister(ws: WebSocketServerProtocol) -> None:
         preview_last_at.pop(ws, None)
 
 
-async def _collect_targets(user_id: int | None, to_admins: bool) -> list[WebSocketServerProtocol]:
+async def _collect_targets(user_id: int | None, to_admins: bool) -> list[ServerConnection]:
     async with registry_lock:
-        targets: set[WebSocketServerProtocol] = set()
+        targets: set[ServerConnection] = set()
         if user_id is not None and user_id > 0:
             targets |= user_connections.get(user_id, set())
         if to_admins:
@@ -147,7 +153,7 @@ async def fan_out_event(
     message = {"type": msg_type, "payload": payload}
     targets = await _collect_targets(user_id, to_admins)
     sent = 0
-    dead: list[WebSocketServerProtocol] = []
+    dead: list[ServerConnection] = []
 
     for ws in targets:
         try:
@@ -164,7 +170,7 @@ async def fan_out_event(
 
 
 async def _handle_join(
-    ws: WebSocketServerProtocol,
+    ws: ServerConnection,
     data: dict,
     *,
     joined: bool,
@@ -202,7 +208,7 @@ async def _handle_join(
     return True, True
 
 
-async def _handle_preview_moderation(ws: WebSocketServerProtocol, data: dict) -> None:
+async def _handle_preview_moderation(ws: ServerConnection, data: dict) -> None:
     text = str(data.get("text", "")).strip()
     if len(text) < 2:
         await _send_json(ws, {
@@ -242,7 +248,7 @@ async def _handle_preview_moderation(ws: WebSocketServerProtocol, data: dict) ->
     })
 
 
-async def _dispatch_message(ws: WebSocketServerProtocol, raw: str, *, joined: bool) -> tuple[bool, bool]:
+async def _dispatch_message(ws: ServerConnection, raw: str, *, joined: bool) -> tuple[bool, bool]:
     try:
         data = json.loads(raw)
     except json.JSONDecodeError:
@@ -283,7 +289,7 @@ async def _dispatch_message(ws: WebSocketServerProtocol, raw: str, *, joined: bo
         return True, False
 
 
-async def ws_client_handler(ws: WebSocketServerProtocol) -> None:
+async def ws_client_handler(ws: ServerConnection) -> None:
     ip = _peer_ip(ws)
     log.info("WebSocket connect ip=%s", ip)
     joined = False
@@ -375,10 +381,11 @@ async def _run_push_server() -> None:
     site = web.TCPSite(runner, PUSH_HOST, PUSH_PORT)
     await site.start()
     log.info("HTTP push server listening on http://%s:%s", PUSH_HOST, PUSH_PORT)
+    print(f"  Push HTTP : http://127.0.0.1:{PUSH_PORT}  (health: /health)", flush=True)
 
 
 async def _run_ws_server() -> None:
-    async with websockets.serve(
+    async with serve(
         ws_client_handler,
         WS_HOST,
         WS_PORT,
@@ -387,17 +394,111 @@ async def _run_ws_server() -> None:
         max_size=2**20,
     ):
         log.info("WebSocket server listening on ws://%s:%s", WS_HOST, WS_PORT)
+        print(f"  WebSocket : ws://127.0.0.1:{WS_PORT}", flush=True)
+        print("Realtime server running. Press Ctrl+C to stop.", flush=True)
         await asyncio.Future()
 
 
 async def main() -> None:
     log.info("Starting ApexSocial WebSocket + push servers")
+    print("Starting ApexSocial realtime server...", flush=True)
     await asyncio.gather(_run_ws_server(), _run_push_server())
 
 
+def _port_in_use(host: str, port: int) -> bool:
+    """True if we cannot bind to this port (another server is listening)."""
+    import socket
+
+    bind_host = "0.0.0.0" if host in ("0.0.0.0", "") else host
+    with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as sock:
+        try:
+            sock.bind((bind_host, port))
+            return False
+        except OSError:
+            return True
+
+
+def _pids_listening_on(port: int) -> set[int]:
+    """Return PIDs of processes actively LISTENING on the given TCP port."""
+    import subprocess
+
+    pids: set[int] = set()
+    try:
+        out = subprocess.check_output(
+            ["netstat", "-ano", "-p", "TCP"],
+            text=True,
+            stderr=subprocess.DEVNULL,
+        )
+    except Exception as ex:
+        log.warning("Could not run netstat to inspect port %s: %s", port, ex)
+        return pids
+
+    needle = f":{port}"
+    for line in out.splitlines():
+        parts = line.split()
+        # Format: Proto  Local  Foreign  State  PID
+        if len(parts) < 5 or parts[0].upper() != "TCP":
+            continue
+        local, state, pid = parts[1], parts[3], parts[-1]
+        if state.upper() != "LISTENING":
+            continue
+        if local.endswith(needle) and pid.isdigit():
+            pids.add(int(pid))
+    return pids
+
+
+def _free_ports(ports: tuple[int, ...]) -> None:
+    """Kill any process currently LISTENING on the given ports (except ourselves)."""
+    import subprocess
+    import time
+
+    my_pid = os.getpid()
+    victims: set[int] = set()
+    for port in ports:
+        victims |= _pids_listening_on(port)
+    victims.discard(my_pid)
+
+    if not victims:
+        return
+
+    for pid in victims:
+        try:
+            subprocess.run(
+                ["taskkill", "/F", "/PID", str(pid)],
+                stdout=subprocess.DEVNULL,
+                stderr=subprocess.DEVNULL,
+                check=False,
+            )
+            log.info("Freed port: killed existing process PID %s.", pid)
+        except Exception as ex:
+            log.warning("Could not kill PID %s: %s", pid, ex)
+
+    # Give the OS a moment to release the sockets before we bind.
+    for _ in range(20):
+        if not any(_port_in_use(WS_HOST, p) for p in ports):
+            break
+        time.sleep(0.25)
+
+
 if __name__ == "__main__":
+    # Auto-free the ports: if something is already listening on 8080/8081,
+    # kill it and take over so `python ws_server.py` always starts cleanly.
+    _free_ports((WS_PORT, PUSH_PORT))
+
+    still_busy = [p for p in (WS_PORT, PUSH_PORT) if _port_in_use(WS_HOST, p)]
+    if still_busy:
+        log.error(
+            "Port(s) %s are still in use and could not be freed automatically. "
+            "Close the process holding them and try again.",
+            ", ".join(str(p) for p in still_busy),
+        )
+        raise SystemExit(1)
+
     try:
         asyncio.run(main())
+    except KeyboardInterrupt:
+        print("\nRealtime server stopped (Ctrl+C). Bye.", flush=True)
+        log.info("Realtime server stopped (Ctrl+C). Bye.")
     except OSError as exc:
         if getattr(exc, "winerror", None) == 10048 or exc.errno == 10048:
             log.error(
